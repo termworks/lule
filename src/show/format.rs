@@ -7,7 +7,7 @@ use std::ops::Range;
 pub fn show_colors(scheme: &Scheme, colrange: Range<usize>, padding: usize) {
     let colors = scheme.colors().clone().unwrap();
     for i in colrange {
-        let val = if true {
+        let val = if padding == 0 {
             format!("  {:#03}  ", i)
         } else {
             format!(
