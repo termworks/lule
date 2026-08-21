@@ -6,8 +6,8 @@ import json
 pub fn write_temp(scheme &Scheme) {
 	if scheme.colors.len > 0 {
 		mut record := []string{}
-		for color in scheme.colors {
-			record << color.to_hex(true)
+		for swatch in scheme.colors {
+			record << swatch.to_hex(true)
 		}
 		write_temp_file('lule_colors', record.join('\n'))
 	}
@@ -35,8 +35,8 @@ pub fn write_cache(scheme &Scheme) {
 
 	if scheme.colors.len > 0 {
 		mut record := []string{}
-		for color in scheme.colors {
-			record << color.to_hex(true)
+		for swatch in scheme.colors {
+			record << swatch.to_hex(true)
 		}
 		write_to_file(os.join_path(scheme.cache, 'colors'), record.join('\n'))
 	}

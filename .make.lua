@@ -116,6 +116,24 @@ make.recipe{ name = "clean", desc = "remove the build artifacts",
 make.recipe{ name = "compile", desc = "clean, then build", deps = { "clean", "build" } }
 make.alias("c", "compile")
 
+
+-- Directories containing a `*_test.v`, deduplicated. Two globs because `src/**` does not match
+-- files sitting directly in `src/`.
+local function test_dirs()
+  local seen, dirs = {}, {}
+  for _, pattern in ipairs({ "src/*_test.v", "src/**/*_test.v" }) do
+    for _, file in ipairs(oslo.fs.glob(pattern)) do
+      local dir = file:match("^(.*)/[^/]+$") or "."
+      if not seen[dir] then
+        seen[dir] = true
+        dirs[#dirs + 1] = dir
+      end
+    end
+  end
+  table.sort(dirs)
+  return dirs
+end
+
 ---------------------------------------------------------------------------- the gate
 
 make.recipe{ name = "check", desc = "vet the source",
@@ -135,8 +153,17 @@ make.recipe{
   desc = "the V tests, then a smoke test of the built binary",
   deps = { "build" },
   run = function()
+    -- Every directory holding a test, discovered rather than listed.
+    --
+    -- `v test src/` does not recurse into the module directories under it, so the moment a module
+    -- was extracted its tests silently stopped running while the gate still reported green.
+    -- Deriving the list means adding a module cannot quietly drop its tests.
+    local dirs = test_dirs()
+    assert(#dirs > 0, "no test files found; the suite cannot be empty")
     -- Strict `sh`, so a failing V test fails the gate. `oslo.run` here would swallow the status.
-    sh.v("test", SRC)
+    -- Unpacked, not passed as a table: `sh` takes words. Safe in final position, where multiple
+    -- return values are not truncated to one.
+    sh.v("test", table.unpack(dirs))
     make.run("smoke")
   end,
 }

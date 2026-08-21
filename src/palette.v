@@ -1,5 +1,6 @@
 module main
 
+import color
 import os
 
 pub fn palette_from_image(image string, backend string) []string {
@@ -9,16 +10,16 @@ pub fn palette_from_image(image string, backend string) []string {
 	}
 	mut colors := []string{}
 	for pg in colors_lab {
-		lab_color := color_from_lab(pg.color.l, pg.color.a, pg.color.b, 1.0)
+		lab_color := color.color_from_lab(pg.color.l, pg.color.a, pg.color.b, 1.0)
 		colors << lab_color.to_hex(true)
 	}
 	return colors
 }
 
-pub fn colors_from_file(path string) []Color {
-	mut colors := []Color{}
+pub fn colors_from_file(path string) []color.Color {
+	mut colors := []color.Color{}
 	for line in lines_to_vec(path) {
-		colors << color_from_hex(line)
+		colors << color.color_from_hex(line)
 	}
 	return colors
 }
@@ -46,10 +47,10 @@ pub fn named_scheme(config_dir string, name string) []string {
 			if token.len != 3 && token.len != 6 {
 				continue
 			}
-			if token.bytes().any(hex_val(it) < 0) {
+			if token.bytes().any(color.hex_val(it) < 0) {
 				continue
 			}
-			colors << color_from_hex(token).to_hex(true)
+			colors << color.color_from_hex(token).to_hex(true)
 		}
 		if colors.len == 0 {
 			eprintln('${red_bold('error:')} ${yellow(path)} holds no hex colours')

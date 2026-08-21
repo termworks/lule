@@ -3,7 +3,6 @@ module cmd
 // Named `cmd` rather than `cli` on purpose: vlib ships its own `cli` module, so `import cli` in
 // this project silently resolved to that one instead. Every reference then failed with
 // "unknown function", while the file on disk looked perfectly correct.
-
 import os
 
 pub const version = '0.5.1'

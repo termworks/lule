@@ -1,5 +1,6 @@
 module main
 
+import color
 import json
 
 pub struct Pattern {
@@ -10,7 +11,7 @@ pub mut:
 
 pub struct Scheme {
 pub mut:
-	colors       []Color @[skip]
+	colors       []color.Color @[skip]
 	image        string
 	theme        string
 	pigments     []string

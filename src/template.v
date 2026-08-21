@@ -1,5 +1,6 @@
 module main
 
+import color
 import math
 import os
 import strings
@@ -8,7 +9,7 @@ import strings
 // pipeline rather than becoming strings at the first opportunity — that is what lets
 // `{{ color1 | lighten: 0.2 | set_alpha: 0.5 }}` mean anything, and it is the difference between
 // a templating engine that understands colour and one doing string substitution.
-type TplValue = Color | []Color | bool | f64 | string
+type TplValue = color.Color | []color.Color | bool | f64 | string
 
 // A bare `{{ color1 }}` prints **without** the leading hash, because that is what it has always
 // printed and every template in the wild supplies its own: `templates/colors.sh` writes
@@ -22,7 +23,7 @@ fn (v TplValue) display() string {
 		string {
 			v
 		}
-		Color {
+		color.Color {
 			if v.alpha < 0.999 {
 				color_field(v, 'hex_alpha_stripped') or { v.to_hex(false) }
 			} else {
@@ -39,7 +40,7 @@ fn (v TplValue) display() string {
 		f64 {
 			show_number(v)
 		}
-		[]Color {
+		[]color.Color {
 			v.map(it.to_hex(false)).join(' ')
 		}
 	}
@@ -50,8 +51,8 @@ fn (v TplValue) truthy() bool {
 		bool { v }
 		f64 { v != 0.0 }
 		string { v != '' && v != 'false' && v != '0' }
-		Color { true }
-		[]Color { v.len > 0 }
+		color.Color { true }
+		[]color.Color { v.len > 0 }
 	}
 }
 
@@ -61,11 +62,11 @@ fn fmt2(x f64) string {
 
 // The colour formats a config file might want. Named after matugen's so a template written for
 // one is readable against the other.
-fn color_field(c Color, field string) !string {
+fn color_field(c color.Color, field string) !string {
 	r, g, b := c.rgb_u8()
 	hsl := c.to_hsl()
 	lab := c.to_lab()
-	alpha := clamp01(c.alpha)
+	alpha := color.clamp01(c.alpha)
 	return match field {
 		'hex' { c.to_hex(true) }
 		'hex_stripped' { c.to_hex(false) }
@@ -87,13 +88,15 @@ fn color_field(c Color, field string) !string {
 	}
 }
 
-fn as_color(v TplValue, filter string) !Color {
+fn as_color(v TplValue, filter string) !color.Color {
 	return match v {
-		Color {
+		color.Color {
 			v
 		}
 		string {
-			parse_hex(v) or { return error('`${filter}` needs a colour, got the string `${v}`') }
+			color.parse_hex(v) or {
+				return error('`${filter}` needs a colour, got the string `${v}`')
+			}
 		}
 		else {
 			error('`${filter}` needs a colour')
@@ -127,42 +130,46 @@ fn apply_filter(input TplValue, name string, args []string) !TplValue {
 		'saturate' {
 			c := as_color(input, name)!
 			hsl := c.to_hsl()
-			return TplValue(color_from_hsl(hsl.h, clamp01(hsl.s + as_number(args, 0, name)!), hsl.l))
+			return TplValue(color.color_from_hsl(hsl.h, color.clamp01(hsl.s +
+				as_number(args, 0, name)!), hsl.l))
 		}
 		'desaturate' {
 			c := as_color(input, name)!
 			hsl := c.to_hsl()
-			return TplValue(color_from_hsl(hsl.h, clamp01(hsl.s - as_number(args, 0, name)!), hsl.l))
+			return TplValue(color.color_from_hsl(hsl.h, color.clamp01(hsl.s - as_number(args, 0,
+				name)!), hsl.l))
 		}
 		'set_hue' {
 			c := as_color(input, name)!
 			hsl := c.to_hsl()
-			return TplValue(color_from_hsl(as_number(args, 0, name)!, hsl.s, hsl.l))
+			return TplValue(color.color_from_hsl(as_number(args, 0, name)!, hsl.s, hsl.l))
 		}
 		'set_saturation' {
 			c := as_color(input, name)!
 			hsl := c.to_hsl()
-			return TplValue(color_from_hsl(hsl.h, clamp01(as_number(args, 0, name)!), hsl.l))
+			return TplValue(color.color_from_hsl(hsl.h, color.clamp01(as_number(args, 0, name)!),
+				hsl.l))
 		}
 		'set_lightness' {
 			c := as_color(input, name)!
 			hsl := c.to_hsl()
-			return TplValue(color_from_hsl(hsl.h, hsl.s, clamp01(as_number(args, 0, name)!)))
+			return TplValue(color.color_from_hsl(hsl.h, hsl.s, color.clamp01(as_number(args, 0,
+				name)!)))
 		}
 		'set_alpha' {
 			mut c := as_color(input, name)!
-			c.alpha = clamp01(as_number(args, 0, name)!)
+			c.alpha = color.clamp01(as_number(args, 0, name)!)
 			return TplValue(c)
 		}
 		'rotate' {
 			c := as_color(input, name)!
 			hsl := c.to_hsl()
-			return TplValue(color_from_hsl(hsl.h + as_number(args, 0, name)!, hsl.s, hsl.l))
+			return TplValue(color.color_from_hsl(hsl.h + as_number(args, 0, name)!, hsl.s, hsl.l))
 		}
 		'grayscale' {
 			c := as_color(input, name)!
 			hsl := c.to_hsl()
-			return TplValue(color_from_hsl(hsl.h, 0.0, hsl.l))
+			return TplValue(color.color_from_hsl(hsl.h, 0.0, hsl.l))
 		}
 		'complement' {
 			return TplValue(as_color(input, name)!.complementary())
@@ -170,25 +177,27 @@ fn apply_filter(input TplValue, name string, args []string) !TplValue {
 		'invert' {
 			c := as_color(input, name)!
 			r, g, b := c.rgb_u8()
-			return TplValue(color_from_rgb(255 - r, 255 - g, 255 - b))
+			return TplValue(color.color_from_rgb(255 - r, 255 - g, 255 - b))
 		}
 		'mix' {
 			c := as_color(input, name)!
 			if args.len < 1 {
 				return error('`mix` needs a colour to mix with')
 			}
-			other := parse_hex(args[0]) or { return error('`mix`: `${args[0]}` is not a colour') }
+			other := color.parse_hex(args[0]) or {
+				return error('`mix`: `${args[0]}` is not a colour')
+			}
 			amount := if args.len > 1 { as_number(args, 1, name)! } else { 0.5 }
-			return TplValue(c.mix_lab(other, clamp01(amount)))
+			return TplValue(c.mix_lab(other, color.clamp01(amount)))
 		}
 		// Picks whichever of black or white reads against this colour. The reason a template can
 		// set a foreground without the author knowing what the background turned out to be.
 		'contrast' {
 			c := as_color(input, name)!
 			readable := if c.to_lab().l < 55.0 {
-				color_from_rgb(255, 255, 255)
+				color.color_from_rgb(255, 255, 255)
 			} else {
-				color_from_rgb(0, 0, 0)
+				color.color_from_rgb(0, 0, 0)
 			}
 			return TplValue(readable)
 		}
@@ -387,7 +396,7 @@ fn eval_expr(expr string, ctx map[string]TplValue) !string {
 		found := ctx[name] or {
 			// A bare hex literal is a colour, so `{{ #ff0000 | lighten: 0.1 }}` works without
 			// having to name it first.
-			if c := parse_hex(name) {
+			if c := color.parse_hex(name) {
 				TplValue(c)
 			} else {
 				return error('unknown name `${name}`')
@@ -397,7 +406,7 @@ fn eval_expr(expr string, ctx map[string]TplValue) !string {
 		if parts.len > 1 {
 			field := parts[1..].join('.')
 			match found {
-				Color { value = TplValue(color_field(found, field)!) }
+				color.Color { value = TplValue(color_field(found, field)!) }
 				else { return error('`${name}` has no field `${field}`') }
 			}
 		}
@@ -623,7 +632,7 @@ fn render_nodes(nodes []Node, ctx map[string]TplValue, mut out strings.Builder, 
 					problems << 'for ... in ${node.text}: unknown name'
 					continue
 				}
-				if items is []Color {
+				if items is []color.Color {
 					for i, item in items {
 						mut inner := ctx.clone()
 						inner[node.name] = TplValue(item)
@@ -680,9 +689,9 @@ pub fn template_context(scheme &Scheme) map[string]TplValue {
 		ctx['cursor'] = TplValue(scheme.colors[1])
 		ctx['accent'] = TplValue(scheme.colors[1])
 	}
-	mut extracted := []Color{}
+	mut extracted := []color.Color{}
 	for hex in scheme.pigments {
-		extracted << color_from_hex(hex)
+		extracted << color.color_from_hex(hex)
 	}
 	ctx['colors'] = TplValue(scheme.colors)
 	// The sixteen a terminal actually uses. `colors` holds all 256, and a template wanting only

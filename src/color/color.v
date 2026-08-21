@@ -1,4 +1,4 @@
-module main
+module color
 
 import math
 
@@ -32,7 +32,7 @@ pub mut:
 	l f64
 }
 
-fn clamp01(v f64) f64 {
+pub fn clamp01(v f64) f64 {
 	if v < 0.0 {
 		return 0.0
 	}
@@ -54,7 +54,7 @@ pub fn (c Color) rgb_u8() (u8, u8, u8) {
 }
 
 // sRGB companding, D65 reference white
-fn linearize(v f64) f64 {
+pub fn linearize(v f64) f64 {
 	if v <= 0.04045 {
 		return v / 12.92
 	}

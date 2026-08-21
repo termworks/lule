@@ -1,8 +1,9 @@
 module main
 
+import color
 import math
 
-// Median cut, in Lab.
+// Median cut, in color.Lab.
 //
 // Repeatedly splits the widest axis of a box at its median. Where k-means chases cluster centres
 // and so gravitates to whatever covers the most area, median cut divides the *space* — so a
@@ -15,7 +16,7 @@ import math
 // majority in half and the minority colours never get a box of their own. On a test image that is
 // 70% flat grey, the planted red came back 55 ΔE away - which is not red.
 struct Swatch {
-	color Lab
+	color color.Lab
 	count int
 }
 
@@ -54,7 +55,7 @@ fn (b Box) spread() (int, f64) {
 
 // Weighted by pixel count, so the average sits where the pixels actually are even though the
 // splitting ignored how many there were.
-fn (b Box) average() (Lab, int) {
+fn (b Box) average() (color.Lab, int) {
 	mut l := 0.0
 	mut a := 0.0
 	mut bb := 0.0
@@ -67,15 +68,15 @@ fn (b Box) average() (Lab, int) {
 		total += s.count
 	}
 	if total == 0 {
-		return Lab{0.0, 0.0, 0.0, 1.0}, 0
+		return color.Lab{0.0, 0.0, 0.0, 1.0}, 0
 	}
 	n := f64(total)
-	return Lab{l / n, a / n, bb / n, 1.0}, total
+	return color.Lab{l / n, a / n, bb / n, 1.0}, total
 }
 
 // Collapses pixels onto a fine grid so that "distinct colour" means something on a photograph,
 // where almost every pixel differs slightly from its neighbour.
-fn to_swatches(pixels []Lab) []Swatch {
+fn to_swatches(pixels []color.Lab) []Swatch {
 	step := 2.0
 	mut counts := map[string]int{}
 	mut sums := map[string][]f64{}
@@ -95,12 +96,12 @@ fn to_swatches(pixels []Lab) []Swatch {
 	for key, count in counts {
 		acc := sums[key] or { continue }
 		n := f64(count)
-		out << Swatch{Lab{acc[0] / n, acc[1] / n, acc[2] / n, 1.0}, count}
+		out << Swatch{color.Lab{acc[0] / n, acc[1] / n, acc[2] / n, 1.0}, count}
 	}
 	return out
 }
 
-pub fn palette_median_cut(pixels []Lab, count int) []Pigment {
+pub fn palette_median_cut(pixels []color.Lab, count int) []Pigment {
 	if pixels.len == 0 || count < 1 {
 		return []Pigment{}
 	}
@@ -148,12 +149,12 @@ pub fn palette_median_cut(pixels []Lab, count int) []Pigment {
 	return out
 }
 
-// Frequency counting over a coarse Lab grid.
+// Frequency counting over a coarse color.Lab grid.
 //
 // The fastest of the three, and the one that keeps a colour that is *rare but vivid* — a neon sign
 // in a night photograph — which both k-means and median cut average away. Counts are weighted by
 // chroma so that a wallpaper's acre of grey sky does not win every slot.
-pub fn palette_histogram(pixels []Lab, count int) []Pigment {
+pub fn palette_histogram(pixels []color.Lab, count int) []Pigment {
 	if pixels.len == 0 || count < 1 {
 		return []Pigment{}
 	}
@@ -201,12 +202,12 @@ pub fn palette_histogram(pixels []Lab, count int) []Pigment {
 			break
 		}
 		acc := sums[key] or { continue }
-		mean := Lab{acc[0] / acc[3], acc[1] / acc[3], acc[2] / acc[3], 1.0}
+		mean := color.Lab{acc[0] / acc[3], acc[1] / acc[3], acc[2] / acc[3], 1.0}
 		// Buckets are a grid, so two neighbouring cells can hold near-identical colours. Without
 		// this the palette fills up with sixteen shades of the same thing.
 		mut duplicate := false
 		for already in out {
-			if delta_e_cie76(mean, already.color) < 8.0 {
+			if color.delta_e_cie76(mean, already.color) < 8.0 {
 				duplicate = true
 				break
 			}
@@ -224,7 +225,7 @@ pub fn palette_histogram(pixels []Lab, count int) []Pigment {
 // The other three read a palette out of the image. This one reads a single *source* colour and
 // derives the rest, so every slot shares a hue and the result is coherent in a way an extracted
 // palette never is. Good on busy wallpapers, where extraction returns sixteen unrelated colours.
-pub fn palette_tonal(pixels []Lab, count int) []Pigment {
+pub fn palette_tonal(pixels []color.Lab, count int) []Pigment {
 	if pixels.len == 0 || count < 1 {
 		return []Pigment{}
 	}
@@ -242,21 +243,21 @@ pub fn palette_tonal(pixels []Lab, count int) []Pigment {
 		}
 	}
 
-	source := color_from_lab(seed.l, seed.a, seed.b, 1.0)
+	source := color.color_from_lab(seed.l, seed.a, seed.b, 1.0)
 	hsl := source.to_hsl()
 	mut out := []Pigment{}
 	for i in 0 .. count {
 		// Evenly spaced tones across a usable band, ends excluded: pure black and pure white are
 		// the background and foreground, and a palette that hands them back wastes two slots.
 		lightness := 0.08 + 0.84 * (f64(i) / f64(if count > 1 { count - 1 } else { 1 }))
-		tone := color_from_hsl(hsl.h, hsl.s, lightness)
+		tone := color.color_from_hsl(hsl.h, hsl.s, lightness)
 		out << Pigment{tone.to_lab(), 1.0 / f64(count)}
 	}
 	return out
 }
 
 // The lightness of a pigment, or zero. Only used by the tests, which need to assert that a tonal
-// ramp ascends without reaching into the Lab struct at every step.
+// ramp ascends without reaching into the color.Lab struct at every step.
 pub fn (p Pigment) l_or_zero() f64 {
 	return p.color.l
 }

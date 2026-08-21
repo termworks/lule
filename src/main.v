@@ -1,5 +1,6 @@
 module main
 
+import color
 import os
 import cmd
 
@@ -49,8 +50,8 @@ fn cmd_colors(a &cmd.Args, mut scheme Scheme) {
 	}
 
 	if !is_tty_stdout() {
-		for color in scheme.colors {
-			println(color.to_hex(true))
+		for swatch in scheme.colors {
+			println(swatch.to_hex(true))
 		}
 		return
 	}
@@ -114,9 +115,9 @@ fn cmd_test(a &cmd.Args, mut scheme Scheme) {
 	cols, rows := term_size()
 	display_image(scheme.image, cols - 10, rows - 13) or {}
 	println('Palette')
-	mut colors := []Color{}
+	mut colors := []color.Color{}
 	for hexstr in palette {
-		colors << color_from_hex(hexstr)
+		colors << color.color_from_hex(hexstr)
 	}
 	show_specified_colors(colors, pad_for(cols))
 	println('\n6th')

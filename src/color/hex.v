@@ -1,6 +1,6 @@
-module main
+module color
 
-fn hex_val(ch u8) int {
+pub fn hex_val(ch u8) int {
 	if ch >= `0` && ch <= `9` {
 		return int(ch - `0`)
 	}

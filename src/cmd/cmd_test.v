@@ -1,4 +1,4 @@
-module main
+module cmd
 
 fn test_subcommand_and_trailing_action() {
 	a := parse_args(['create', '--image=wall.png', '--', 'set'])

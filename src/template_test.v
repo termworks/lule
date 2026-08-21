@@ -1,18 +1,19 @@
 module main
 
+import color
 import os
 
 fn ctx() map[string]TplValue {
 	return {
-		'background': TplValue(color_from_hex('#101820'))
-		'accent':     TplValue(color_from_hex('#3f51b5'))
-		'red':        TplValue(color_from_hex('#ff0000'))
+		'background': TplValue(color.color_from_hex('#101820'))
+		'accent':     TplValue(color.color_from_hex('#3f51b5'))
+		'red':        TplValue(color.color_from_hex('#ff0000'))
 		'theme':      TplValue('dark')
 		'dark':       TplValue(true)
 		'light':      TplValue(false)
 		'empty':      TplValue('')
-		'colors':     TplValue([color_from_hex('#111111'), color_from_hex('#222222'),
-			color_from_hex('#333333')])
+		'colors':     TplValue([color.color_from_hex('#111111'),
+			color.color_from_hex('#222222'), color.color_from_hex('#333333')])
 	}
 }
 
@@ -52,15 +53,15 @@ fn test_whitespace_inside_braces_is_optional() {
 fn test_colour_filters() {
 	// Lightening raises lightness and darkening lowers it; the exact value is the colour code's
 	// business, the direction is this engine's.
-	lighter := color_from_hex(render_ok('{{ accent | lighten: 0.2 }}'))
-	darker := color_from_hex(render_ok('{{ accent | darken: 0.2 }}'))
-	base := color_from_hex('#3f51b5')
+	lighter := color.color_from_hex(render_ok('{{ accent | lighten: 0.2 }}'))
+	darker := color.color_from_hex(render_ok('{{ accent | darken: 0.2 }}'))
+	base := color.color_from_hex('#3f51b5')
 	assert lighter.to_lab().l > base.to_lab().l
 	assert darker.to_lab().l < base.to_lab().l
 
 	assert render_ok('{{ red | invert }}') == '00ffff'
 	assert render_ok('{{ red | grayscale }}') == render_ok('{{ red | grayscale }}')
-	grey := color_from_hex(render_ok('{{ red | grayscale }}'))
+	grey := color.color_from_hex(render_ok('{{ red | grayscale }}'))
 	r, g, b := grey.rgb_u8()
 	assert r == g && g == b
 }

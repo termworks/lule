@@ -1,6 +1,7 @@
 module main
 
 import os
+import cmd
 
 fn write_scheme_file(dir string, name string, body string) string {
 	path := os.join_path(dir, name)
@@ -54,6 +55,6 @@ fn test_named_scheme_finds_suffixed_files() {
 }
 
 fn test_no_scripts_flag_is_recognised() {
-	assert parse_args(['create', '--no-scripts', '--', 'set']).present['no-scripts']
-	assert parse_args(['create', '-n', '--', 'set']).present['n']
+	assert cmd.parse_args(['create', '--no-scripts', '--', 'set']).present['no-scripts']
+	assert cmd.parse_args(['create', '-n', '--', 'set']).present['n']
 }

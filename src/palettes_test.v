@@ -1,26 +1,28 @@
 module main
 
+import cmd
+import color
 import math
 
-fn planted_pixels() []Lab {
+fn planted_pixels() []color.Lab {
 	// Three tight blobs of very different colours, plus a large flat grey area. The grey is the
 	// majority, which is what separates the backends: some chase area, some chase colour.
-	mut pixels := []Lab{}
+	mut pixels := []color.Lab{}
 	for _ in 0 .. 300 {
-		pixels << color_from_rgb(130, 130, 130).to_lab()
+		pixels << color.color_from_rgb(130, 130, 130).to_lab()
 	}
-	for c in [color_from_rgb(220, 20, 20), color_from_rgb(20, 200, 20),
-		color_from_rgb(20, 20, 220)] {
+	for c in [color.color_from_rgb(220, 20, 20), color.color_from_rgb(20, 200, 20),
+		color.color_from_rgb(20, 20, 220)] {
 		r, g, b := c.rgb_u8()
 		for i in 0 .. 40 {
 			jitter := u8(i % 3)
-			pixels << color_from_rgb(r + jitter, g + jitter, b + jitter).to_lab()
+			pixels << color.color_from_rgb(r + jitter, g + jitter, b + jitter).to_lab()
 		}
 	}
 	return pixels
 }
 
-fn chroma_of(c Lab) f64 {
+fn chroma_of(c color.Lab) f64 {
 	return math.sqrt(c.a * c.a + c.b * c.b)
 }
 
@@ -28,7 +30,7 @@ fn every_backend() []string {
 	return ['pigment', 'median', 'histogram', 'tonal']
 }
 
-fn run_backend(name string, pixels []Lab, count int) []Pigment {
+fn run_backend(name string, pixels []color.Lab, count int) []Pigment {
 	return match name {
 		'median' { palette_median_cut(pixels, count) }
 		'histogram' { palette_histogram(pixels, count) }
@@ -41,9 +43,10 @@ fn test_every_backend_is_reachable_from_the_flag() {
 	// The list the flag validates against and the list the dispatch understands have to agree,
 	// or a name is accepted and then silently does nothing.
 	for name in every_backend() {
-		assert name in known_palettes, '${name} is not in known_palettes'
+		known := cmd.known_palettes()
+		assert name in known, '${name} is not in known_palettes'
 	}
-	assert known_palettes.len == every_backend().len
+	assert cmd.known_palettes().len == every_backend().len
 }
 
 fn test_every_backend_returns_colours() {
@@ -63,9 +66,9 @@ fn test_every_backend_survives_no_pixels() {
 
 fn test_every_backend_survives_one_flat_colour() {
 	// A solid-colour wallpaper has fewer distinct colours than slots asked for.
-	mut flat := []Lab{}
+	mut flat := []color.Lab{}
 	for _ in 0 .. 50 {
-		flat << color_from_rgb(90, 90, 90).to_lab()
+		flat << color.color_from_rgb(90, 90, 90).to_lab()
 	}
 	for name in every_backend() {
 		out := run_backend(name, flat, 16)
@@ -88,11 +91,11 @@ fn test_median_cut_finds_the_planted_colours() {
 	// Median cut divides the colour space rather than chasing area, so the three small blobs
 	// survive being outnumbered four to one by grey.
 	found := palette_median_cut(planted_pixels(), 8)
-	for target in [color_from_rgb(220, 20, 20), color_from_rgb(20, 200, 20),
-		color_from_rgb(20, 20, 220)] {
+	for target in [color.color_from_rgb(220, 20, 20), color.color_from_rgb(20, 200, 20),
+		color.color_from_rgb(20, 20, 220)] {
 		mut best := 1.0e9
 		for p in found {
-			d := delta_e_cie76(target.to_lab(), p.color)
+			d := color.delta_e_cie76(target.to_lab(), p.color)
 			if d < best {
 				best = d
 			}
@@ -119,7 +122,7 @@ fn test_histogram_does_not_return_near_duplicates() {
 	found := palette_histogram(planted_pixels(), 16)
 	for i in 0 .. found.len {
 		for j in i + 1 .. found.len {
-			d := delta_e_cie76(found[i].color, found[j].color)
+			d := color.delta_e_cie76(found[i].color, found[j].color)
 			assert d >= 8.0, 'entries ${i} and ${j} are only ${d} apart'
 		}
 	}
@@ -135,14 +138,14 @@ fn test_tonal_is_one_hue_from_dark_to_light() {
 		assert found[i].l_or_zero() > found[i - 1].l_or_zero(), 'not ascending at ${i}'
 	}
 	for p in found {
-		hex := color_from_lab(p.color.l, p.color.a, p.color.b, 1.0).to_hex(true)
+		hex := color.color_from_lab(p.color.l, p.color.a, p.color.b, 1.0).to_hex(true)
 		assert hex != '#000000' && hex != '#ffffff', 'ramp hit ${hex}'
 	}
 
 	// One hue throughout, which is the whole point of deriving rather than extracting.
 	mut hues := []f64{}
 	for p in found {
-		c := color_from_lab(p.color.l, p.color.a, p.color.b, 1.0)
+		c := color.color_from_lab(p.color.l, p.color.a, p.color.b, 1.0)
 		if chroma_of(p.color) > 4.0 {
 			hues << c.to_hsl().h
 		}
@@ -175,7 +178,7 @@ fn test_backends_disagree_with_each_other() {
 	for name in every_backend() {
 		mut key := ''
 		for p in run_backend(name, pixels, 8) {
-			key += color_from_lab(p.color.l, p.color.a, p.color.b, 1.0).to_hex(true)
+			key += color.color_from_lab(p.color.l, p.color.a, p.color.b, 1.0).to_hex(true)
 		}
 		assert key !in seen, '${name} produced an identical palette to another backend'
 		seen[key] = true

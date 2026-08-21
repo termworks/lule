@@ -1,5 +1,6 @@
 module main
 
+import color
 import os
 import term
 
@@ -15,7 +16,7 @@ pub fn blue(s string) string {
 	return term.blue(s)
 }
 
-fn bg_truecolor(c Color, text string) string {
+fn bg_truecolor(c color.Color, text string) string {
 	r, g, b := c.rgb_u8()
 	fg := if c.to_lab().l < 30.0 { '255;255;255' } else { '0;0;0' }
 	return '\x1b[48;2;${r};${g};${b}m\x1b[38;2;${fg}m${text}\x1b[0m'
@@ -39,7 +40,7 @@ pub fn show_colors(scheme &Scheme, from int, to int, padding int) {
 	println('')
 }
 
-pub fn show_specified_colors(colors []Color, padding int) {
+pub fn show_specified_colors(colors []color.Color, padding int) {
 	pad := ' '.repeat(if padding > 0 { padding } else { 1 })
 	for i, color in colors {
 		val := '${pad}${color.to_hex(true)}${pad}'
