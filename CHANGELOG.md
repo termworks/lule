@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.5.1] - 2026-08-21
+
+### <!-- 0 -->⛰️  Features
+
+- Add arithmetic and range loops to templates
+- Add template includes with cycle detection
+- Add case filters to the template engine
+- Colour-aware template engine with filters and control flow
+
+### <!-- 3 -->📚 Documentation
+
+- Remove a duplicated note about the case filters
+- Document the template engine
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Back out the accidental v0.6.0 release
+- Take the toolchain from the flake instead of a second pin
+
 ## [0.5.0] - 2026-08-21
 
 ### <!-- 0 -->⛰️  Features

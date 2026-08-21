@@ -127,3 +127,117 @@ scheme — so clearing the variable does not stop it. `--no-scripts` (or `-n`) d
 ```
 lule create -n --image=~/wall.png -- set
 ```
+
+## Templates
+
+A template is any file with placeholders; `--pattern=IN:OUT` renders `IN` over `OUT`. The syntax
+follows [matugen](https://github.com/InioX/matugen)'s, so templates read much the same either way.
+
+### Values
+
+`color0` … `color255`, plus `background`, `foreground`, `cursor`, `accent`, and the string values
+`wallpaper` and `theme`. `dark` and `light` are booleans. `colors` and `pigments` are lists.
+
+A bare `{{ color1 }}` prints hex **without** the leading `#`, which is what it has always done —
+existing templates write `'#{{ color1 }}'` and supply their own.
+
+### Colour formats
+
+```
+{{ accent.hex }}            #3f51b5
+{{ accent.hex_stripped }}   3f51b5
+{{ accent.hex_alpha }}      #3f51b5ff
+{{ accent.rgb }}            rgb(63, 81, 181)
+{{ accent.rgba }}           rgba(63, 81, 181, 1.00)
+{{ accent.hsl }}            hsl(230, 48%, 48%)
+{{ accent.red }} {{ accent.green }} {{ accent.blue }} {{ accent.alpha }}
+{{ accent.hue }} {{ accent.saturation }} {{ accent.lightness }} {{ accent.luminance }}
+```
+
+### Filters
+
+Values stay colours between stages, so filters chain:
+
+```
+{{ accent | lighten: 0.2 | grayscale }}
+```
+
+| | |
+|---|---|
+| colour | `lighten` `darken` `saturate` `desaturate` `rotate` `grayscale` `invert` `complement` |
+| set | `set_hue` `set_saturation` `set_lightness` `set_alpha` |
+| combine | `mix: "#ff0000", 0.5` |
+| readable | `contrast` — black or white, whichever reads against the input |
+| text | `upper` `lower` `trim` `capitalize` `replace: "a", "b"` `default: "fallback"` |
+| case | `snake_case` `kebab_case` `camel_case` `pascal_case` |
+
+A literal works as the input too: `{{ "#3f51b5" | lighten: 0.1 }}`.
+
+The case filters take the input apart whatever convention it arrived in, so `helloWorld`,
+`hello-world` and `HELLO_WORLD` all snake_case to `hello_world`. A run of capitals stays one word
+until the last of them (`XMLHttpRequest` becomes `xml_http_request`), and digits stay attached to
+the word before them, so `color0` does not become `color_0`.
+
+`upper_case`, `lower_case` and the `_case` names are matugen's spellings and work here too.
+
+### Conditionals and loops
+
+```
+<* if dark *>set background dark<* else *>set background light<* endif *>
+<* if theme == "dark" *>…<* endif *>
+<* if not light *>…<* endif *>
+
+<* for c in colors *>{{ c.hex }}<* if not loop_last *>, <* endif *><* endfor *>
+```
+
+Inside a loop, `loop_index`, `loop_first` and `loop_last` are available.
+
+### Arithmetic
+
+```
+{{ 2 + 3 * 4 }}        14 - precedence, not left to right
+{{ (2 + 3) * 4 }}      20
+{{ 5 / 2 }}            2.5 - whole results print as integers
+{{ count * 2 + 1 }}    names holding numbers work as operands
+```
+
+`+ - * / %` with parentheses and unary minus. Division or modulo by zero is reported rather than
+producing an infinity.
+
+### Ranges
+
+```
+<* for i in 0..5 *>{{ i }}<* endfor *>      01234   - stops before 5, as in Rust
+<* for i in 0..=5 *>{{ i }}<* endfor *>     012345  - inclusive
+<* for i in -2..2 *>{{ i }}<* endfor *>     -2 -1 0 1
+<* for i in 0..count * 2 *>...<* endfor *>  both ends may be expressions
+```
+
+A backwards range such as `10..0` is empty rather than counting down - counting down would be a
+silent guess about what was meant. A range longer than 100000 steps is refused and reported, so a
+mistyped bound says so instead of appearing to hang.
+
+### Includes
+
+```
+<* include "partial.conf" *>
+```
+
+The path is resolved **beside the file the include appears in**, not beside wherever lule was
+run from, so a partial next to its template is just its name. The content is spliced into the
+tree rather than rendered separately, which means an include inside a loop can use the loop
+variable:
+
+```
+<* for c in colors *><* include "row.conf" *><* endfor *>
+```
+
+A file may be included any number of times, but a file that ends up including itself is refused
+and reported - including when the cycle only shows up after the paths are resolved, so
+`sub/../sub/x.conf` and `sub/x.conf` are recognised as the same file. Nesting stops at 16 deep.
+
+### When something is wrong
+
+An unknown name, field or filter is reported on stderr and the placeholder is **left in the
+output** rather than replaced with nothing — a config full of blanks is harder to diagnose than
+one that still shows what failed.
