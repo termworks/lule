@@ -65,7 +65,7 @@ fn weighted_pick(weights []f64) int {
 // K-means++ clustering in CIE Lab space
 pub fn palette_kmeans(pixels []Lab, k int, max_iter int) []Pigment {
 	tolerance := 1e-4
-	if pixels.len == 0 {
+	if pixels.len == 0 || k < 1 {
 		return []Pigment{}
 	}
 
@@ -166,9 +166,21 @@ fn sample_pixels(path string, max_dim int) ![]Lab {
 	return pixels
 }
 
-pub fn pigments(image_path string, count int, iters int) ![]Pigment {
+// Dispatches to whichever extractor was asked for. They all take the same sampled pixels and
+// return the same shape, so the rest of the pipeline neither knows nor cares which ran.
+pub fn pigments(image_path string, count int, iters int, backend string) ![]Pigment {
 	pixels := sample_pixels(image_path, 512)!
-	mut output := palette_kmeans(pixels, count, iters)
-	output.sort(a.dominance > b.dominance)
+	mut output := match backend {
+		'median' { palette_median_cut(pixels, count) }
+		'histogram' { palette_histogram(pixels, count) }
+		'tonal' { palette_tonal(pixels, count) }
+		else { palette_kmeans(pixels, count, iters) }
+	}
+
+	// tonal is already ordered as a ramp, dark to light; re-sorting it by dominance would shuffle
+	// the one backend whose order carries meaning.
+	if backend != 'tonal' {
+		output.sort(a.dominance > b.dominance)
+	}
 	return output
 }

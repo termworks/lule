@@ -19,7 +19,7 @@ const subcommands = ['create', 'daemon', 'colors', 'config', 'test']
 const multi_flags = ['pattern', 'script']
 
 // The palette extractors that exist. `--palette` used to accept anything.
-pub const known_palettes = ['pigment']
+pub const known_palettes = ['pigment', 'median', 'histogram', 'tonal']
 
 // clap's InferSubcommands: accept any unambiguous prefix
 fn resolve_subcommand(name string) string {
@@ -129,7 +129,7 @@ pub fn print_help(logo string) {
 	println('    create    Generate new colors from an image')
 	println('                --wallpath=<DIRPATH>  folder to pick an image randomly')
 	println('                --image=<FILEPATH>    image to extract colors from')
-	println('                --palette=<NAME>      pigment (default)')
+	println('                --palette=<NAME>      pigment (default) | median | histogram | tonal')
 	println('                --scheme=<NAME>       color scheme from configs')
 	println('                --theme=<THEME>       dark (default) | light')
 	println('                --sort=<MODE>         dominance (default) | hue | light | dark | chroma')

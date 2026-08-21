@@ -106,7 +106,7 @@ fn cmd_test(a &Args, mut scheme Scheme) {
 		scheme.image = random_image(scheme.walldir)
 	}
 
-	palette := palette_from_image(scheme.image)
+	palette := palette_from_image(scheme.image, scheme.palette)
 	scheme.pigments = palette
 	scheme.colors = get_all_colors(mut scheme)
 

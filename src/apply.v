@@ -38,8 +38,8 @@ pub fn write_colors(mut scheme Scheme, old bool) {
 		if scheme.image == '' {
 			scheme.image = random_image(scheme.walldir)
 		}
-		if scheme.palette == 'pigment' {
-			palette := palette_from_image(scheme.image)
+		if scheme.palette in known_palettes {
+			palette := palette_from_image(scheme.image, scheme.palette)
 			write_temp_file('lule_palette', palette.join('\n'))
 			scheme.pigments = palette
 		}
