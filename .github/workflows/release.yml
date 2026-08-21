@@ -35,10 +35,14 @@ jobs:
       - name: Install V
         uses: vlang/setup-v@v1.7
         with:
-          # Pinned, not `check-latest`. V's formatter changes between releases, so chasing
-          # latest means an upstream V release fails `v fmt -verify` on a commit that changed
-          # nothing. The version here matches the one the flake pins through flake.lock.
-          version-file: .v-version
+          # The latest V *release*, not the latest commit. `check-latest` follows master, whose
+          # formatter changes under you — that failed `v fmt -verify` here on a commit that
+          # touched no V source. A pinned `version:` is worse still: setup-v builds it from
+          # source, and 0.5.2 no longer bootstraps against the current `vc`.
+          #
+          # `stable` downloads the release prebuilt, and V ships both v_linux and
+          # v_linux_arm64, so one line covers both runners.
+          stable: true
 
       - name: Resolve version
         id: meta

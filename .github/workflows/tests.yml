@@ -27,10 +27,28 @@ jobs:
       - name: Install V
         uses: vlang/setup-v@v1.7
         with:
-          # Pinned, not `check-latest`. V's formatter changes between releases, so chasing
-          # latest means an upstream V release fails `v fmt -verify` on a commit that changed
-          # nothing. The version here matches the one the flake pins through flake.lock.
-          version-file: .v-version
+          # The latest V *release*, not the latest commit. `check-latest` follows master, whose
+          # formatter changes under you — that failed `v fmt -verify` here on a commit that
+          # touched no V source. A pinned `version:` is worse still: setup-v builds it from
+          # source, and 0.5.2 no longer bootstraps against the current `vc`.
+          #
+          # `stable` downloads the release prebuilt, and V ships both v_linux and
+          # v_linux_arm64, so one line covers both runners.
+          stable: true
+
+      # A warning, not a failure. When V cuts a release, `stable` moves and the flake does not —
+      # and the first symptom would otherwise be `v fmt -verify` failing for no visible reason.
+      # This puts the explanation directly above it. Bump .v-version and the flake to clear it.
+      - name: Toolchain drift check
+        run: |
+          set -euo pipefail
+          want="$(cat .v-version)"
+          have="$(v version | awk '{print $2}')"
+          if [ "$want" != "$have" ]; then
+            echo "::warning::CI has V $have but .v-version pins $want."
+            echo "::warning::A formatting failure below is likely toolchain drift, not your commit."
+          fi
+          echo "V $have (.v-version: $want)"
 
       - name: Formatting
         run: v fmt -verify src/
