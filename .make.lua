@@ -236,44 +236,22 @@ make.recipe{
 
 ---------------------------------------------------------------------------- releasing
 
+-- Delegated rather than written out here, the same way oslo's own `.make.lua` does it. `git-rel`
+-- bumps the version through `veri`, writes the changelog with git-cliff, tags, pushes, merges
+-- develop into main and cuts the GitHub release — and it is the same sequence for every project,
+-- so having a second copy of it here is how the two drift.
+--
+-- `veri` is what knows about V: it reads and writes both `v.mod` and the `const version` in
+-- `src/cli.v`, so a release cannot leave `lule --version` disagreeing with the manifest.
 make.recipe{
   name = "release",
-  desc = "cut a version: --type patch | minor | major",
-  params = { { "--type", desc = "patch | minor | major" } },
+  desc = "cut a version: --type patch | minor | major | M.m.p",
+  params = { { "--type", desc = "patch | minor | major | M.m.p" } },
   run = function(a)
-    local part = a.type
-    assert(part == "patch" or part == "minor" or part == "major",
-           "which release? make release --type patch|minor|major")
-
-    local major, minor, patch = VERSION:match("^(%d+)%.(%d+)%.(%d+)$")
-    assert(major, "version in v.mod is not M.m.p: " .. VERSION)
-    major, minor, patch = tonumber(major), tonumber(minor), tonumber(patch)
-    if part == "major" then major, minor, patch = major + 1, 0, 0
-    elseif part == "minor" then minor, patch = minor + 1, 0
-    else patch = patch + 1 end
-    local next_version = ("%d.%d.%d"):format(major, minor, patch)
-
-    local tag = oslo.run{ "git", "describe", "--tags", "--abbrev=0", capture = true }
-    local range = tag.ok and (tag.out:gsub("%s+$", "") .. "..HEAD") or nil
-
-    -- The changelog is written before the version bump is committed, so the commit that bumps it
-    -- is the one carrying the notes.
-    if range then
-      sh["git-cliff"]("--tag", next_version, range, "--prepend", "CHANGELOG.md")
-    else
-      sh["git-cliff"]("--tag", next_version, "--unreleased", "--prepend", "CHANGELOG.md")
-    end
-
-    -- The version lives in two files and they must not drift: `v.mod` is the manifest and
-    -- `src/cli.v` is what `lule --version` prints.
-    oslo.fs.write("v.mod", manifest:gsub("version:%s*'[^']+'", "version: '" .. next_version .. "'", 1))
-    local cli = oslo.fs.read("src/cli.v")
-    oslo.fs.write("src/cli.v",
-      cli:gsub("pub const version = '[^']+'", "pub const version = '" .. next_version .. "'", 1))
-
-    sh.git("add", "-A")
-    sh.git("commit", "-m", "chore(release): prepare for " .. next_version)
-    sh.git("tag", "-a", next_version, "-m", next_version)
-    print("tagged " .. next_version .. " - push with: git push --follow-tags")
+    assert(oslo.run{ "sh", "-c", "command -v git-rel" }.ok,
+           "git-rel is not installed; install it first")
+    assert(type(a.type) == "string",
+           "which release? make release --type patch|minor|major|M.m.p")
+    sh.git("rel", a.type)
   end,
 }
