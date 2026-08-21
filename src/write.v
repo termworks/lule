@@ -20,15 +20,35 @@ pub fn write_temp(scheme &Scheme) {
 	write_temp_file('lule_scheme', scheme.to_json())
 }
 
+// Written from the scheme rather than copied out of /tmp.
+//
+// Copying meant the cache picked up whatever a *previous* run had left at the fixed temp paths:
+// `--palette=<something unknown>` extracted no pigments, and the cache was then filled from an
+// earlier run's /tmp/lule_palette — a scheme built out of another wallpaper's colours, reported
+// as success. The temp files are still written for scripts that read them; they are just no
+// longer the route the cache is filled by.
 pub fn write_cache(scheme &Scheme) {
 	if scheme.cache == '' {
 		return
 	}
 	os.mkdir_all(scheme.cache) or {}
-	copy_to(temp_path('lule_colors'), os.join_path(scheme.cache, 'colors'))
-	copy_to(temp_path('lule_wallpaper'), os.join_path(scheme.cache, 'wallpaper'))
-	copy_to(temp_path('lule_theme'), os.join_path(scheme.cache, 'theme'))
-	copy_to(temp_path('lule_palette'), os.join_path(scheme.cache, 'palette'))
+
+	if scheme.colors.len > 0 {
+		mut record := []string{}
+		for color in scheme.colors {
+			record << color.to_hex(true)
+		}
+		write_to_file(os.join_path(scheme.cache, 'colors'), record.join('\n'))
+	}
+	if scheme.pigments.len > 0 {
+		write_to_file(os.join_path(scheme.cache, 'palette'), scheme.pigments.join('\n'))
+	}
+	if scheme.image != '' {
+		write_to_file(os.join_path(scheme.cache, 'wallpaper'), scheme.image)
+	}
+	if scheme.theme != '' {
+		write_to_file(os.join_path(scheme.cache, 'theme'), scheme.theme)
+	}
 }
 
 pub fn write_cache_json(scheme &Scheme, payload string) {

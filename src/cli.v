@@ -18,6 +18,9 @@ const subcommands = ['create', 'daemon', 'colors', 'config', 'test']
 
 const multi_flags = ['pattern', 'script']
 
+// The palette extractors that exist. `--palette` used to accept anything.
+pub const known_palettes = ['pigment']
+
 // clap's InferSubcommands: accept any unambiguous prefix
 fn resolve_subcommand(name string) string {
 	if name in subcommands {

@@ -112,6 +112,13 @@ fn args_concatinate(a &Args, mut scheme Scheme) {
 				scheme.theme = v
 			}
 			if v := a.flags['palette'] {
+				// Anything else extracted no pigments at all and then reported success, so the
+				// scheme was built from whatever happened to be cached already.
+				if v !in known_palettes {
+					eprintln('${red_bold('error:')} unknown palette ${yellow(v)}')
+					eprintln('${red_bold('error:')} known palettes: ${known_palettes.join(', ')}')
+					exit(1)
+				}
 				scheme.palette = v
 			}
 			if v := a.flags['scheme'] {

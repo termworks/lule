@@ -39,11 +39,24 @@ pub fn random_image(dir string) string {
 	return valid_image(pick)
 }
 
+// Refuses to write through a symlink.
+//
+// The temp files have fixed, predictable names in a directory everyone can write to, so on a
+// shared machine another user can drop a symlink at /tmp/lule_colors pointing anywhere this user
+// can write, and lule would truncate the target. Checking the path itself — not what it resolves
+// to — is what closes that, and it costs one lstat.
 pub fn write_to_file(path string, content string) {
+	if os.is_link(path) {
+		eprintln('${red_bold('error:')} ${yellow(path)} is a symlink; refusing to write through it')
+		exit(1)
+	}
 	os.write_file(path, content) or {
 		eprintln('${red_bold('error:')} Could not write into ${yellow(path)} -> ${err}')
 		exit(1)
 	}
+	// The scheme names the wallpaper directory and every script that will be run; that is nobody
+	// else's business on a shared machine.
+	os.chmod(path, 0o600) or {}
 }
 
 pub fn write_temp_file(name string, content string) {
