@@ -1,8 +1,9 @@
 module main
 
 import os
+import cmd
 
-fn cmd_create(a &Args, mut scheme Scheme) {
+fn cmd_create(a &cmd.Args, mut scheme Scheme) {
 	concatinate(a, mut scheme, a.action != 'regen')
 	match a.action {
 		'set' { write_colors(mut scheme, false) }
@@ -11,7 +12,7 @@ fn cmd_create(a &Args, mut scheme Scheme) {
 	}
 }
 
-fn cmd_colors(a &Args, mut scheme Scheme) {
+fn cmd_colors(a &cmd.Args, mut scheme Scheme) {
 	concatinate(a, mut scheme, a.present['g'])
 	scheme.scripts = []
 
@@ -82,7 +83,7 @@ fn pad_for(cols int) int {
 	return (cols - 56) / 16
 }
 
-fn cmd_config(a &Args, mut scheme Scheme) {
+fn cmd_config(a &cmd.Args, mut scheme Scheme) {
 	concatinate(a, mut scheme, false)
 	payload := scheme.to_json()
 	if !is_tty_stdout() {
@@ -92,7 +93,7 @@ fn cmd_config(a &Args, mut scheme Scheme) {
 	}
 }
 
-fn cmd_test(a &Args, mut scheme Scheme) {
+fn cmd_test(a &cmd.Args, mut scheme Scheme) {
 	defs_concatinate(mut scheme)
 	envi_concatinate(mut scheme)
 	args_concatinate(a, mut scheme)
@@ -131,18 +132,18 @@ fn main() {
 	mut scheme := Scheme{}
 
 	if argv.len == 0 {
-		print_help(read_logo())
+		cmd.print_help(cmd.read_logo())
 		return
 	}
 
-	a := parse_args(argv)
+	a := cmd.parse_args(argv)
 
 	if a.present['help'] || a.present['h'] {
-		print_help(read_logo())
+		cmd.print_help(cmd.read_logo())
 		return
 	}
 	if a.present['version'] || a.present['V'] {
-		println('lule ${version}')
+		println('lule ${cmd.version}')
 		return
 	}
 
@@ -164,7 +165,7 @@ fn main() {
 			cmd_test(a, mut scheme)
 		}
 		else {
-			print_help(read_logo())
+			cmd.print_help(cmd.read_logo())
 		}
 	}
 }

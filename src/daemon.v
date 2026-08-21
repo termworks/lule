@@ -2,6 +2,7 @@ module main
 
 import os
 import time
+import cmd
 
 fn C.mkfifo(path &char, mode u32) int
 
@@ -176,7 +177,7 @@ fn send_to_daemon(message string) {
 	write_to_file(temp_path('lule_pipe'), message)
 }
 
-pub fn run_daemon(a &Args, mut scheme Scheme) {
+pub fn run_daemon(a &cmd.Args, mut scheme Scheme) {
 	match a.action {
 		'start' {
 			daemoned(mut scheme)

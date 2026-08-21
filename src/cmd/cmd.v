@@ -1,4 +1,8 @@
-module main
+module cmd
+
+// Named `cmd` rather than `cli` on purpose: vlib ships its own `cli` module, so `import cli` in
+// this project silently resolved to that one instead. Every reference then failed with
+// "unknown function", while the file on disk looked perfectly correct.
 
 import os
 
@@ -14,12 +18,14 @@ pub mut:
 	present    map[string]bool
 }
 
-const subcommands = ['create', 'daemon', 'colors', 'config', 'test']
+pub const subcommands = ['create', 'daemon', 'colors', 'config', 'test']
 
-const multi_flags = ['pattern', 'script']
+pub const multi_flags = ['pattern', 'script']
 
 // The palette extractors that exist. `--palette` used to accept anything.
-pub const known_palettes = ['pigment', 'median', 'histogram', 'tonal']
+pub fn known_palettes() []string {
+	return ['pigment', 'median', 'histogram', 'tonal']
+}
 
 // clap's InferSubcommands: accept any unambiguous prefix
 fn resolve_subcommand(name string) string {

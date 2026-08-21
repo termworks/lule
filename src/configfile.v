@@ -2,6 +2,7 @@ module main
 
 import os
 import toml
+import cmd
 
 // The config file lives beside the named schemes, in $LULE_C or ~/.config/lule.
 //
@@ -169,7 +170,7 @@ pub fn parse_contrast(text string) f64 {
 }
 
 // Resolves only where the config file is, ahead of reading it.
-fn locate_config(a &Args, mut scheme Scheme) {
+fn locate_config(a &cmd.Args, mut scheme Scheme) {
 	if v := os.getenv_opt('LULE_C') {
 		if v.trim_space() != '' {
 			scheme.config = expand_home(v)

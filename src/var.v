@@ -1,6 +1,7 @@
 module main
 
 import os
+import cmd
 
 #include <poll.h>
 
@@ -60,7 +61,7 @@ fn temp_concatinate(mut scheme Scheme) {
 
 // The palette-tuning flags, shared by `create` and `test` so a setting can be previewed with the
 // command that draws it and then applied with the command that saves it.
-fn tuning_concatinate(a &Args, mut scheme Scheme) {
+fn tuning_concatinate(a &cmd.Args, mut scheme Scheme) {
 	if v := a.flags['saturation'] {
 		scheme.saturation = v.f64()
 	}
@@ -87,7 +88,7 @@ fn tuning_concatinate(a &Args, mut scheme Scheme) {
 	}
 }
 
-fn args_concatinate(a &Args, mut scheme Scheme) {
+fn args_concatinate(a &cmd.Args, mut scheme Scheme) {
 	if a.multi['script'].len > 0 {
 		mut scripts := scheme.scripts.clone()
 		scripts << a.multi['script']
@@ -131,9 +132,10 @@ fn args_concatinate(a &Args, mut scheme Scheme) {
 			if v := a.flags['palette'] {
 				// Anything else extracted no pigments at all and then reported success, so the
 				// scheme was built from whatever happened to be cached already.
-				if v !in known_palettes {
+				known := cmd.known_palettes()
+				if v !in known {
 					eprintln('${red_bold('error:')} unknown palette ${yellow(v)}')
-					eprintln('${red_bold('error:')} known palettes: ${known_palettes.join(', ')}')
+					eprintln('${red_bold('error:')} known palettes: ${known.join(', ')}')
 					exit(1)
 				}
 				scheme.palette = v
@@ -238,7 +240,7 @@ fn pipe_concatinate(mut scheme Scheme) {
 // is a source required: `create -- regen`, `colors` without `-g`, `config` and `daemon stop`
 // all read what is already in the cache, and demanding $LULE_W from them made every one of them
 // fail on a machine that has no wallpaper directory configured at all.
-pub fn concatinate(a &Args, mut scheme Scheme, needs_image bool) {
+pub fn concatinate(a &cmd.Args, mut scheme Scheme, needs_image bool) {
 	temp_concatinate(mut scheme)
 	defs_concatinate(mut scheme)
 	// Where the config lives is settled before it is read, because that is the one thing the
