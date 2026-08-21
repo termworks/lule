@@ -1,4 +1,4 @@
-module main
+module template
 
 import color
 import math
@@ -9,7 +9,7 @@ import strings
 // pipeline rather than becoming strings at the first opportunity — that is what lets
 // `{{ color1 | lighten: 0.2 | set_alpha: 0.5 }}` mean anything, and it is the difference between
 // a templating engine that understands colour and one doing string substitution.
-type TplValue = color.Color | []color.Color | bool | f64 | string
+pub type TplValue = color.Color | []color.Color | bool | f64 | string
 
 // A bare `{{ color1 }}` prints **without** the leading hash, because that is what it has always
 // printed and every template in the wild supplies its own: `templates/colors.sh` writes
@@ -18,7 +18,7 @@ type TplValue = color.Color | []color.Color | bool | f64 | string
 //
 // Alpha is appended once the colour carries any, so `{{ accent | set_alpha: 0.5 }}` does not
 // render identically to `{{ accent }}` and look like the filter did nothing.
-fn (v TplValue) display() string {
+pub fn (v TplValue) display() string {
 	return match v {
 		string {
 			v
@@ -677,39 +677,6 @@ fn eval_condition(expr string, ctx map[string]TplValue, mut problems []string) b
 	return if negate { !result } else { result }
 }
 
-// Everything a template can name.
-pub fn template_context(scheme &Scheme) map[string]TplValue {
-	mut ctx := map[string]TplValue{}
-	for i, color in scheme.colors {
-		ctx['color${i}'] = TplValue(color)
-	}
-	if scheme.colors.len > 15 {
-		ctx['background'] = TplValue(scheme.colors[0])
-		ctx['foreground'] = TplValue(scheme.colors[15])
-		ctx['cursor'] = TplValue(scheme.colors[1])
-		ctx['accent'] = TplValue(scheme.colors[1])
-	}
-	mut extracted := []color.Color{}
-	for hex in scheme.pigments {
-		extracted << color.color_from_hex(hex)
-	}
-	ctx['colors'] = TplValue(scheme.colors)
-	// The sixteen a terminal actually uses. `colors` holds all 256, and a template wanting only
-	// the ANSI set had no way to stop at sixteen: there is no dynamic lookup by index, and a
-	// loop cannot break early.
-	if scheme.colors.len >= 16 {
-		ctx['ansi'] = TplValue(scheme.colors[..16].clone())
-	}
-	ctx['pigments'] = TplValue(extracted)
-	ctx['wallpaper'] = TplValue(scheme.image)
-	ctx['theme'] = TplValue(scheme.theme)
-	ctx['dark'] = TplValue(scheme.is_dark())
-	ctx['light'] = TplValue(!scheme.is_dark())
-	return ctx
-}
-
-// `dir` is where a relative `<* include *>` is resolved from - the directory of the template
-// being rendered, so an include means the file beside it rather than beside the shell.
 pub fn render_in(content string, ctx map[string]TplValue, dir string) (string, []string) {
 	mut st := ParseState{
 		dir: dir
