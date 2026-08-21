@@ -230,7 +230,7 @@ make.recipe{
   run = function()
     assert(oslo.run{ "sh", "-c", "command -v mdbook" }.ok,
            "mdbook is not installed, and the book needs it")
-    sh.mdbook("build", "book", "--dest-dir", "../docs")
+    sh.mdbook("build", "book", "--dest-dir", "docs")
   end,
 }
 

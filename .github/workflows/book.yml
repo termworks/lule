@@ -4,6 +4,15 @@ on:
   push:
     branches:
       - develop
+    # Only when the book or this workflow actually changes. It used to rebuild and redeploy on
+    # every commit, including ones touching nothing but V source.
+    paths:
+      - 'book/**'
+      - '.github/workflows/book.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   deploy_site:
@@ -12,14 +21,22 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Setup mdBook
-        uses: peaceiris/actions-mdbook@v1
+        uses: peaceiris/actions-mdbook@v2
         with:
-          mdbook-version: 'latest'
+          # Pinned to the version the flake provides. On 'latest' this workflow broke twice over:
+          # mdbook 0.5 dropped the `multilingual` key that book.toml carried, and it changed
+          # --dest-dir to resolve against the working directory rather than the book root.
+          mdbook-version: '0.5.4'
 
-      - run: mdbook build book --dest-dir ../docs
+      # `docs`, not `../docs`. Under mdbook 0.5 the latter resolves against the working directory
+      # and writes the book *outside* the checkout, leaving publish_dir pointing at nothing.
+      - run: mdbook build book --dest-dir docs
+
+      - name: Fail if the build produced nothing
+        run: test -f docs/index.html || { echo "::error::book output is missing"; exit 1; }
 
       - name: Deploy
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./docs

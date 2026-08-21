@@ -7,3 +7,4 @@ devbox.lock
 *.tmp.c
 result
 result-*
+docs/

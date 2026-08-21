@@ -1,8 +1,7 @@
 [book]
 authors = ["Trim Bresilla"]
 language = "en"
-multilingual = false
-# title = "roc"
+title = "lule"
 
 [output.html]
 default-theme = "navy"
