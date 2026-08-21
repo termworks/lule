@@ -74,6 +74,14 @@ fn tuning_concatinate(a &Args, mut scheme Scheme) {
 	if v := a.flags['seed'] {
 		scheme.seed = v.int()
 	}
+	if v := a.flags['contrast'] {
+		scheme.contrast = match v.to_lower() {
+			'aa' { contrast_aa }
+			'aaa' { contrast_aaa }
+			'none', 'off', '0' { -1.0 }
+			else { v.f64() }
+		}
+	}
 	if a.present['norandom'] {
 		scheme.norandom = true
 	}

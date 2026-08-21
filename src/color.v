@@ -236,3 +236,29 @@ pub fn delta_e_cie76(a Lab, b Lab) f64 {
 	db := a.b - b.b
 	return math.sqrt(dl * dl + da * da + db * db)
 }
+
+// WCAG relative luminance. The same linearised channels the Lab conversion uses, weighted for
+// perceived brightness rather than for a colour space.
+pub fn (c Color) relative_luminance() f64 {
+	return 0.2126 * linearize(clamp01(c.r)) + 0.7152 * linearize(clamp01(c.g)) +
+		0.0722 * linearize(clamp01(c.b))
+}
+
+// WCAG contrast, from 1.0 (identical) to 21.0 (black on white). 4.5 is the AA threshold for body
+// text and 7.0 is AAA; below 3.0 two colours are hard to tell apart at all.
+pub fn contrast_ratio(a Color, b Color) f64 {
+	la := a.relative_luminance()
+	lb := b.relative_luminance()
+	lighter := if la > lb { la } else { lb }
+	darker := if la > lb { lb } else { la }
+	return (lighter + 0.05) / (darker + 0.05)
+}
+
+// The colour as it will be written: eight bits per channel, the same value the hex in the file
+// decodes back to. Anything that has to be *true of the output* has to be measured on this.
+pub fn (c Color) quantised() Color {
+	r, g, b := c.rgb_u8()
+	mut q := color_from_rgb(r, g, b)
+	q.alpha = c.alpha
+	return q
+}

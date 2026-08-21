@@ -138,6 +138,7 @@ pub fn print_help(logo string) {
 	println('                --hue=<DEGREES>       rotate every pigment round the wheel')
 	println('                --blend=<N>           0 unchanged .. 1.0 all one hue')
 	println('                --seed=<N>            same wallpaper, same scheme, every time')
+	println('                --contrast=<N>        aa (default) | aaa | none | a ratio such as 3.0')
 	println('                --norandom            fixed RGB ramps instead of random ones')
 	println('                -- <set|regen>')
 	println('    daemon    Run as daemon process with looping wallpapers')

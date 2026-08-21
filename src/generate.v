@@ -331,5 +331,150 @@ pub fn get_all_colors(mut scheme Scheme) []Color {
 	}
 
 	colors << gradients
-	return colors
+
+	// Last, on the finished palette, because the threshold is measured against colour 0 and
+	// colour 0 is not decided until everything above has run.
+	return enforce_contrast(colors, resolve_contrast(scheme.contrast))
+}
+
+// The WCAG AA threshold for body text. Terminal colours are body text.
+pub const contrast_aa = 4.5
+pub const contrast_aaa = 7.0
+
+// Reads `--contrast`. Zero means the flag was never given, so the default applies; a negative
+// value is the explicit "leave my colours alone".
+pub fn resolve_contrast(setting f64) f64 {
+	if setting < 0.0 {
+		return 0.0
+	}
+	if setting == 0.0 {
+		return contrast_aa
+	}
+	return setting
+}
+
+// Moves one colour away from the background until it is readable against it.
+//
+// Hue and saturation are kept; only lightness moves, and only as far as it has to. Relative
+// luminance rises monotonically with HSL lightness, so a binary search finds the smallest change
+// that clears the threshold rather than overshooting to white.
+//
+// The direction is whichever side of the background the colour is already on, so a dark colour on
+// a light background gets darker rather than being flipped to the other end.
+pub fn raise_contrast(c Color, background Color, min_ratio f64) Color {
+	// Measured on the colour as it will be written, not as it is held.
+	//
+	// Searching against the f64 colour converged on exactly the threshold, and rounding to eight
+	// bits then dropped it back under: colours came out at 4.48, 4.49 and 4.50 against a 4.5
+	// target. Quantising inside the test makes the guarantee true of the hex in the file.
+	bg := background.quantised()
+	ratio := fn [bg] (candidate Color) f64 {
+		return contrast_ratio(candidate.quantised(), bg)
+	}
+
+	if ratio(c) >= min_ratio {
+		return c
+	}
+	hsl := c.to_hsl()
+
+	// Preferred direction is whichever side of the background the colour is already on, so a dark
+	// colour on a light background gets darker rather than being flipped.
+	//
+	// But the preferred direction is not always the possible one: a colour a shade lighter than a
+	// near-white background can never reach the threshold by getting lighter, however far it
+	// goes. When it cannot, the other direction is tried before giving up.
+	preferred := if c.relative_luminance() >= bg.relative_luminance() { 1.0 } else { 0.0 }
+	opposite := 1.0 - preferred
+
+	mut limit := preferred
+	if ratio(color_from_hsl(hsl.h, hsl.s, preferred)) < min_ratio {
+		if ratio(color_from_hsl(hsl.h, hsl.s, opposite)) >= min_ratio {
+			limit = opposite
+		} else {
+			// Neither end reaches it - against a mid grey, nothing reaches AAA. Take whichever
+			// extreme is the most readable this hue can manage.
+			toward_preferred := ratio(color_from_hsl(hsl.h, hsl.s, preferred))
+			toward_opposite := ratio(color_from_hsl(hsl.h, hsl.s, opposite))
+			best := if toward_preferred >= toward_opposite { preferred } else { opposite }
+			return color_from_hsl(hsl.h, hsl.s, best)
+		}
+	}
+
+	mut near := hsl.l
+	mut far := limit
+	for _ in 0 .. 24 {
+		mid := (near + far) / 2.0
+		if ratio(color_from_hsl(hsl.h, hsl.s, mid)) >= min_ratio {
+			far = mid
+		} else {
+			near = mid
+		}
+	}
+	return color_from_hsl(hsl.h, hsl.s, far)
+}
+
+// The sixteen ANSI slots are what a terminal actually draws text in, so those are the ones held
+// to the threshold. Slot 0 is the background they are measured against, and the ramps past 15 are
+// gradients rather than text colours.
+pub fn enforce_contrast(colors []Color, min_ratio f64) []Color {
+	if min_ratio <= 0.0 || colors.len < 16 {
+		return colors
+	}
+	mut out := colors.clone()
+	background := out[0]
+	for i in 1 .. 16 {
+		out[i] = raise_contrast(out[i], background, min_ratio)
+	}
+
+	// Readability and distinctness pull against each other: on a monochrome wallpaper the six
+	// spread-apart greys all get dragged to whatever lightness clears the threshold and collapse
+	// back into one another. Six identical readable colours is the bug ensure_distinct exists to
+	// prevent, reappearing one step later.
+	//
+	// Separated within the two groups of six the terminal actually uses as colours - normal
+	// 1..6 and bright 9..14 - rather than across all fifteen. Fifteen colours each 10 ΔE apart
+	// need 150 units of lightness, and clearing a contrast floor leaves nowhere near that much:
+	// asking for it squeezed the groups back down to four distinct colours.
+	for group in [[1, 2, 3, 4, 5, 6], [9, 10, 11, 12, 13, 14]] {
+		separate_group(mut out, group, background, min_ratio)
+	}
+	return out
+}
+
+fn separate_group(mut out []Color, group []int, background Color, min_ratio f64) {
+	mut placed := []Color{}
+	for index in group {
+		mut c := out[index]
+		if too_close(c, placed, 10.0) {
+			hsl := c.to_hsl()
+			// Away from the background, never back toward it: moving away raises contrast, so
+			// the threshold cannot be lost while the colours are being separated.
+			away := if c.relative_luminance() >= background.relative_luminance() {
+				1.0
+			} else {
+				0.0
+			}
+			// Ten is comfortable, but on a near-monochrome palette there is not room for six of
+			// them above the contrast floor. Settling for less separation beats leaving two
+			// colours identical.
+			for target in [10.0, 6.0, 3.0, 1.5] {
+				mut found := false
+				for step in 1 .. 33 {
+					lightness := hsl.l + (away - hsl.l) * (f64(step) / 33.0)
+					candidate := color_from_hsl(hsl.h, hsl.s, lightness)
+					if !too_close(candidate, placed, target)
+						&& contrast_ratio(candidate.quantised(), background.quantised()) >= min_ratio {
+						c = candidate
+						found = true
+						break
+					}
+				}
+				if found {
+					break
+				}
+			}
+		}
+		out[index] = c
+		placed << c
+	}
 }

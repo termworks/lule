@@ -71,6 +71,23 @@ lule create --sort=hue -- set            # choose the accent by hue rather than 
 
 `--sort` takes `dominance` (default), `hue`, `light`, `dark` or `chroma`.
 
+### Readability
+
+The sixteen ANSI colours are held to a minimum WCAG contrast against the background, so no slot
+comes out too dim to read. Measured before this existed, 3 to 5 of the 15 fell below AA on real
+wallpapers.
+
+```
+lule create -- set                       # AA (4.5:1), the default
+lule create --contrast=aaa -- set        # 7:1
+lule create --contrast=3.0 -- set        # a ratio of your own
+lule create --contrast=none -- set       # off, colours exactly as extracted
+```
+
+Only lightness moves, and only as far as it has to, so hues survive. Colour 0 is the background
+everything is measured against and the ramps past 15 are gradients rather than text, so both are
+left alone.
+
 ### Reproducible schemes
 
 The gradients are randomised, so the same wallpaper gives a different scheme each time. `--seed`
