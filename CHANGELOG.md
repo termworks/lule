@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.5.0] - 2026-08-21
+
+### <!-- 0 -->⛰️  Features
+
+- Add named schemes, no-scripts and wallpaper fallback
+- Add palette tuning, seeding and json output
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Guarantee sixteen distinguishable ansi colors
+- Build the cache from this run and refuse symlinked writes
+- Bound stdin reads and detect a missing daemon
+- Only require a wallpaper source when generating colors
+
+### <!-- 2 -->🚜 Refactor
+
+- Port from rust to v
+
+### <!-- 6 -->🧪 Testing
+
+- Sweep delta-e symmetry over many pairs
+- Report the values when delta-e symmetry fails
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Pin mdbook and fix the book output path
+- Add a dry run path to the release workflow
+- Install pinned v prebuilt directly
+- Install the stable v release prebuilt
+- Pin the v toolchain instead of chasing latest
+- Build and release linux amd64 and arm64 binaries
+- Replace make and devbox with oslo recipes and a flake
+
+### Build
+
+- Delegate release to git-rel
+
 ## [0.4.2] - 2025-11-11
 
 ## [0.4.1] - 2025-11-11

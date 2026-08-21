@@ -2,7 +2,7 @@ module main
 
 import os
 
-pub const version = '0.4.2'
+pub const version = '0.5.0'
 pub const description = "a command line to set 255 colors on tty's and other places that use ANSI colors"
 
 pub struct Args {
