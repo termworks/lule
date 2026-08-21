@@ -127,3 +127,65 @@ scheme — so clearing the variable does not stop it. `--no-scripts` (or `-n`) d
 ```
 lule create -n --image=~/wall.png -- set
 ```
+
+## Templates
+
+A template is any file with placeholders; `--pattern=IN:OUT` renders `IN` over `OUT`. The syntax
+follows [matugen](https://github.com/InioX/matugen)'s, so templates read much the same either way.
+
+### Values
+
+`color0` … `color255`, plus `background`, `foreground`, `cursor`, `accent`, and the string values
+`wallpaper` and `theme`. `dark` and `light` are booleans. `colors` and `pigments` are lists.
+
+A bare `{{ color1 }}` prints hex **without** the leading `#`, which is what it has always done —
+existing templates write `'#{{ color1 }}'` and supply their own.
+
+### Colour formats
+
+```
+{{ accent.hex }}            #3f51b5
+{{ accent.hex_stripped }}   3f51b5
+{{ accent.hex_alpha }}      #3f51b5ff
+{{ accent.rgb }}            rgb(63, 81, 181)
+{{ accent.rgba }}           rgba(63, 81, 181, 1.00)
+{{ accent.hsl }}            hsl(230, 48%, 48%)
+{{ accent.red }} {{ accent.green }} {{ accent.blue }} {{ accent.alpha }}
+{{ accent.hue }} {{ accent.saturation }} {{ accent.lightness }} {{ accent.luminance }}
+```
+
+### Filters
+
+Values stay colours between stages, so filters chain:
+
+```
+{{ accent | lighten: 0.2 | grayscale }}
+```
+
+| | |
+|---|---|
+| colour | `lighten` `darken` `saturate` `desaturate` `rotate` `grayscale` `invert` `complement` |
+| set | `set_hue` `set_saturation` `set_lightness` `set_alpha` |
+| combine | `mix: "#ff0000", 0.5` |
+| readable | `contrast` — black or white, whichever reads against the input |
+| text | `upper` `lower` `trim` `replace: "a", "b"` `default: "fallback"` |
+
+A literal works as the input too: `{{ "#3f51b5" | lighten: 0.1 }}`.
+
+### Conditionals and loops
+
+```
+<* if dark *>set background dark<* else *>set background light<* endif *>
+<* if theme == "dark" *>…<* endif *>
+<* if not light *>…<* endif *>
+
+<* for c in colors *>{{ c.hex }}<* if not loop_last *>, <* endif *><* endfor *>
+```
+
+Inside a loop, `loop_index`, `loop_first` and `loop_last` are available.
+
+### When something is wrong
+
+An unknown name, field or filter is reported on stderr and the placeholder is **left in the
+output** rather than replaced with nothing — a config full of blanks is harder to diagnose than
+one that still shows what failed.
