@@ -685,6 +685,12 @@ pub fn template_context(scheme &Scheme) map[string]TplValue {
 		extracted << color_from_hex(hex)
 	}
 	ctx['colors'] = TplValue(scheme.colors)
+	// The sixteen a terminal actually uses. `colors` holds all 256, and a template wanting only
+	// the ANSI set had no way to stop at sixteen: there is no dynamic lookup by index, and a
+	// loop cannot break early.
+	if scheme.colors.len >= 16 {
+		ctx['ansi'] = TplValue(scheme.colors[..16].clone())
+	}
 	ctx['pigments'] = TplValue(extracted)
 	ctx['wallpaper'] = TplValue(scheme.image)
 	ctx['theme'] = TplValue(scheme.theme)

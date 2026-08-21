@@ -45,6 +45,30 @@ v -prod -cflags -static src/ -o target/lule
 
 `oslo make` lists the rest — `dev`, `test`, `verify`, `install`, `docs`, `release`.
 
+## Templates that ship
+
+`templates/` holds one per *format*, not per application - a css file themes anything that reads
+css, an ini file anything that reads ini:
+
+```
+colors.sh  colors.css  colors.scss  colors.ini  colors.toml  colors.json  colors.Xresources
+```
+
+Point a template at wherever the program expects it:
+
+```toml
+[templates.gtk]
+input  = "~/.config/lule/templates/colors.css"
+output = "~/.config/gtk-4.0/colors.css"
+```
+
+They use `ansi`, which is the sixteen terminal colours - `colors` is all 256:
+
+```
+<* for c in ansi *>--color{{ loop_index }}: {{ c.hex }};
+<* endfor *>
+```
+
 ## Configuration
 
 Everything below can live in `~/.config/lule/config.toml` (or `$LULE_C/config.toml`) instead of

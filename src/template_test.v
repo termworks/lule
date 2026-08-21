@@ -588,3 +588,32 @@ fn test_ranges_and_lists_still_coexist() {
 	assert render_ok('<* for c in colors *>{{ c.hex }}<* endfor *>') == '#111111#222222#333333'
 	assert render_ok('<* for i in 0..2 *>{{ i }}<* endfor *>') == '01'
 }
+
+fn test_ansi_exposes_only_the_sixteen() {
+	// `colors` is all 256. A template wanting the ANSI set had no way to stop at sixteen: there
+	// is no dynamic lookup by index, and a loop cannot break early.
+	mut scheme := Scheme{
+		theme:    'dark'
+		pigments: ['#3f51b5', '#e91e63', '#4caf50', '#ff9800']
+	}
+	scheme.colors = get_all_colors(mut scheme)
+	c := template_context(&scheme)
+
+	out, problems := render('<* for x in ansi *>{{ loop_index }} <* endfor *>', c)
+	assert problems.len == 0, '${problems}'
+	assert out == '0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 '
+
+	// And it is the same sixteen the palette starts with.
+	first, _ := render('{{ color0.hex }}', c)
+	ansi_first, _ :=
+		render('<* for x in ansi *><* if loop_first *>{{ x.hex }}<* endif *><* endfor *>', c)
+	assert first == ansi_first
+}
+
+fn test_ansi_is_absent_for_a_short_palette() {
+	// Nothing to expose, and a loop over a missing name reports rather than inventing one.
+	_, problems := render('<* for x in ansi *>{{ x }}<* endfor *>', {
+		'theme': TplValue('dark')
+	})
+	assert problems.len == 1
+}
