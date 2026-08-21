@@ -8,7 +8,11 @@ on:
     inputs:
       tag:
         description: 'Existing release tag to build and upload assets for'
-        required: true
+        required: false
+      dry_run:
+        description: 'Build and package both arches, but upload nothing'
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -145,10 +149,21 @@ jobs:
           sha256sum -c SHA256SUMS
           ls -la
 
+      # A dispatch defaults to dry run so the whole pipeline can be exercised — both arches built,
+      # packaged and checksummed — without publishing anything. A `release: created` event never
+      # takes this branch, so cutting a real release still uploads.
+      - name: Dry run, nothing uploaded
+        if: github.event_name == 'workflow_dispatch' && inputs.dry_run
+        run: |
+          echo "::notice::dry run - built and packaged, uploaded nothing"
+          ls -la dist/
+
       - name: Upload to the release
+        if: github.event_name != 'workflow_dispatch' || !inputs.dry_run
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           tag='${{ github.event.release.tag_name || inputs.tag }}'
+          [ -n "$tag" ] || { echo "::error::no tag to upload to"; exit 1; }
           gh release upload "$tag" dist/SHA256SUMS dist/*.tar.gz --clobber --repo '${{ github.repository }}'
