@@ -35,8 +35,20 @@ pub fn random_image(dir string) string {
 		eprintln('${red_bold('error:')} No images found in ${yellow(dir)}')
 		exit(1)
 	}
-	pick := candidates[rand.intn(candidates.len) or { 0 }]
-	return valid_image(pick)
+
+	// Shuffle and take the first that decodes, rather than picking one and giving up if it does
+	// not. A wallpaper directory collects truncated downloads and files whose extension lies, and
+	// one of those used to take the daemon down on whichever cycle happened to choose it.
+	rand.shuffle(mut candidates) or {}
+	for candidate in candidates {
+		if img := stbi.load(candidate, desired_channels: 3) {
+			unsafe { img.free() }
+			return candidate
+		}
+		eprintln('${yellow('warning:')} skipping ${candidate}, it does not decode')
+	}
+	eprintln('${red_bold('error:')} No decodable images in ${yellow(dir)}')
+	exit(1)
 }
 
 // Refuses to write through a symlink.

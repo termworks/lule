@@ -46,7 +46,11 @@ fn temp_concatinate(mut scheme Scheme) {
 			scheme.cache = cache
 		}
 	}
+	// Both are per-invocation choices, not settings. Persisting the named scheme meant one
+	// `--scheme=gruvbox` poisoned the temp scheme, and every later `lule create` — with no
+	// --scheme at all — failed looking for it, until /tmp/lule_scheme was deleted by hand.
 	scheme.image = ''
+	scheme.scheme = ''
 }
 
 // The palette-tuning flags, shared by `create` and `test` so a setting can be previewed with the
@@ -227,6 +231,12 @@ pub fn concatinate(a &Args, mut scheme Scheme, needs_image bool) {
 	envi_concatinate(mut scheme)
 	args_concatinate(a, mut scheme)
 	pipe_concatinate(mut scheme)
+
+	// Scripts survive in the cached scheme, so clearing $LULE_S does not stop them running — the
+	// list was already persisted by an earlier run. This is the switch that actually does.
+	if a.present['no-scripts'] || a.present['n'] {
+		scheme.scripts = []
+	}
 
 	if scheme.scripts.len > 0 {
 		mut seen := map[string]bool{}

@@ -25,6 +25,15 @@ pub fn write_colors(mut scheme Scheme, old bool) {
 			eprintln('${red_bold('error:')} run ${yellow('lule create -- set')} first')
 			exit(1)
 		}
+	} else if scheme.scheme != '' {
+		// A named scheme from the configs directory: a file of hex colours, one per line, used
+		// instead of extracting from a wallpaper. The wallpaper is still recorded so the rest of
+		// the pipeline and any templates still know what is on screen.
+		scheme.pigments = named_scheme(scheme.config, scheme.scheme)
+		if scheme.image == '' && scheme.walldir != '' {
+			scheme.image = random_image(scheme.walldir)
+		}
+		write_temp_file('lule_palette', scheme.pigments.join('\n'))
 	} else {
 		if scheme.image == '' {
 			scheme.image = random_image(scheme.walldir)
