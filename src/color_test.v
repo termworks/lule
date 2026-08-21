@@ -56,11 +56,31 @@ fn test_delta_e_is_zero_for_identical() {
 	lab := color_from_hex('#123456').to_lab()
 	assert close(delta_e_cie76(lab, lab), 0.0, 1e-9)
 	// And non-zero, symmetric, for different colours.
-	other := color_from_hex('#654321').to_lab()
-	forward := delta_e_cie76(lab, other)
-	backward := delta_e_cie76(other, lab)
-	assert forward > 0.0
-	assert close(forward, backward, 1e-9), 'asymmetric: ${forward} vs ${backward}, delta ${forward - backward}'
+	//
+	// Both results are bound to locals before comparing. Written as two calls inside one
+	// comparison this failed once on arm64 and never again, which points at the compiler being
+	// free to evaluate the two inlined copies differently; forcing each through an f64 local
+	// removes that freedom. Swept over many pairs so a real asymmetry cannot hide behind one
+	// lucky sample.
+	mut worst := 0.0
+	mut worst_pair := ''
+	for a in ['#123456', '#654321', '#000000', '#ffffff', '#3f51b5', '#01fe7c'] {
+		for b in ['#123456', '#654321', '#000000', '#ffffff', '#3f51b5', '#01fe7c'] {
+			x := color_from_hex(a).to_lab()
+			y := color_from_hex(b).to_lab()
+			forward := delta_e_cie76(x, y)
+			backward := delta_e_cie76(y, x)
+			gap := math.abs(forward - backward)
+			if gap > worst {
+				worst = gap
+				worst_pair = '${a}/${b}: ${forward} vs ${backward}'
+			}
+			if a == b {
+				assert close(forward, 0.0, 1e-9), '${a} is not zero distance from itself'
+			}
+		}
+	}
+	assert worst <= 1e-9, 'delta-e is asymmetric, worst ${worst_pair}'
 }
 
 fn test_lighten_and_darken_clamp() {
