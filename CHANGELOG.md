@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.6.0] - 2026-08-21
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Take the toolchain from the flake instead of a second pin
+
 ## [0.5.0] - 2026-08-21
 
 ### <!-- 0 -->⛰️  Features
