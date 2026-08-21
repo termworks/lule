@@ -46,6 +46,10 @@
         # second pin that can drift out from under `v fmt -verify`.
         devShells.ci = pkgs.mkShell (staticEnv // { packages = buildTools; });
 
+        # Just the book. Separate from `.#ci` so the docs workflow does not pull a C toolchain it
+        # never invokes, and separate from `.#default` so it does not pull gh and git-cliff.
+        devShells.docs = pkgs.mkShell { packages = [ pkgs.mdbook ]; };
+
         # The CI toolchain plus what a person needs to release and to build the book.
         devShells.default = pkgs.mkShell (staticEnv // {
           packages = buildTools ++ [

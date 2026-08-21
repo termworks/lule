@@ -9,6 +9,7 @@ on:
     paths:
       - 'book/**'
       - '.github/workflows/book.yml'
+      - 'flake.lock'
   workflow_dispatch:
 
 permissions:
@@ -20,17 +21,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup mdBook
-        uses: peaceiris/actions-mdbook@v2
-        with:
-          # Pinned to the version the flake provides. On 'latest' this workflow broke twice over:
-          # mdbook 0.5 dropped the `multilingual` key that book.toml carried, and it changed
-          # --dest-dir to resolve against the working directory rather than the book root.
-          mdbook-version: '0.5.4'
+      # mdbook comes from the flake, like V does for the other two workflows. Pinned by hand it
+      # was a second pin, and this workflow had already broken twice on a moving 'latest':
+      # mdbook 0.5 dropped the `multilingual` key book.toml carried, and it changed --dest-dir to
+      # resolve against the working directory rather than the book root.
+      - uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Toolchain
+        run: nix develop .#docs --command mdbook --version
 
       # `docs`, not `../docs`. Under mdbook 0.5 the latter resolves against the working directory
       # and writes the book *outside* the checkout, leaving publish_dir pointing at nothing.
-      - run: mdbook build book --dest-dir docs
+      - name: Build
+        run: nix develop .#docs --command mdbook build book --dest-dir docs
 
       - name: Fail if the build produced nothing
         run: test -f docs/index.html || { echo "::error::book output is missing"; exit 1; }
