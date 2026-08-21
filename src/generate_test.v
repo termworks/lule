@@ -395,3 +395,61 @@ fn test_illumination_clamps_at_both_ends() {
 		assert c.to_hex(true) == '#000000'
 	}
 }
+
+fn test_ensure_distinct_separates_identical_colours() {
+	// Six copies of one grey is the monochrome-wallpaper case that produced six identical ANSI
+	// colours. Every one of them has to come out telling apart from the others.
+	same := []Color{len: 6, init: color_from_rgb(200, 200, 200)}
+	spread := ensure_distinct(same, 10.0)
+	assert spread.len == 6
+	for i in 0 .. spread.len {
+		for j in i + 1 .. spread.len {
+			d := delta_e_cie76(spread[i].to_lab(), spread[j].to_lab())
+			assert d >= 10.0, 'colours ${i} and ${j} are only ${d} apart'
+		}
+	}
+}
+
+fn test_ensure_distinct_separates_identical_saturated_colours() {
+	same := []Color{len: 6, init: color_from_rgb(200, 40, 40)}
+	spread := ensure_distinct(same, 10.0)
+	for i in 0 .. spread.len {
+		for j in i + 1 .. spread.len {
+			assert delta_e_cie76(spread[i].to_lab(), spread[j].to_lab()) >= 10.0
+		}
+	}
+}
+
+fn test_ensure_distinct_leaves_distinct_colours_alone() {
+	// Already-separated colours must survive untouched; the spreading is a repair, not a filter.
+	original := vivid()
+	for i, c in ensure_distinct(original, 10.0) {
+		assert c.to_hex(true) == original[i].to_hex(true)
+	}
+}
+
+fn test_ensure_distinct_avoids_the_extremes() {
+	// Pure black and pure white are the background and foreground; a spread colour landing on
+	// either is the same collision in a different place.
+	for base in [color_from_rgb(250, 250, 250), color_from_rgb(5, 5, 5)] {
+		for c in ensure_distinct([]Color{len: 6, init: base}, 10.0) {
+			hex := c.to_hex(true)
+			assert hex != '#000000' && hex != '#ffffff', 'spread onto ${hex}'
+		}
+	}
+}
+
+fn test_generated_scheme_has_sixteen_usable_colours() {
+	// Monochrome pigments end to end: the scheme still has to offer sixteen colours a terminal
+	// can tell apart.
+	mut scheme := Scheme{
+		theme:    'dark'
+		pigments: ['#c8c8c8', '#c8c8c8', '#c8c8c8', '#c8c8c8', '#cacaca', '#c9c9c9']
+	}
+	colors := get_all_colors(mut scheme)
+	mut seen := map[string]bool{}
+	for c in colors[1..7] {
+		seen[c.to_hex(true)] = true
+	}
+	assert seen.len == 6, 'only ${seen.len} distinct colours in 1..6'
+}

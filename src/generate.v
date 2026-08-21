@@ -1,6 +1,7 @@
 module main
 
 import rand
+import math
 
 // Mid-lightness colours ordered by chroma, padded with complements
 pub fn gen_main_six(col []Color) []Color {
@@ -158,6 +159,61 @@ pub fn seed_rand(seed int) {
 	rand.seed([lo, lo ^ u32(0x9e3779b9)])
 }
 
+// Pushes apart any colours that are too close to tell from one another.
+//
+// A near-monochrome wallpaper collapses: the six chosen colours come out as light greys, the
+// theme lightening on top clips them all to #ffffff, and ANSI 1-6 end up identical — six terminal
+// colours that cannot be distinguished. Measured on a real wallpaper, colours 1 through 6 were
+// all #ffffff.
+//
+// Where there is chroma to work with the hue is rotated, which keeps lightness intact; on a grey
+// there is no hue to rotate, so lightness steps instead, away from whichever end it is near.
+fn too_close(candidate Color, others []Color, min_delta f64) bool {
+	for other in others {
+		if delta_e_cie76(candidate.to_lab(), other.to_lab()) < min_delta {
+			return true
+		}
+	}
+	return false
+}
+
+pub fn ensure_distinct(colors []Color, min_delta f64) []Color {
+	mut out := []Color{}
+	for c in colors {
+		mut candidate := c
+		base := c.to_hsl()
+		// Each attempt is measured from the original colour rather than from the previous try,
+		// and lightness wraps within a band instead of clamping. Stepping from the previous try
+		// and clamping parked every further attempt on the same endpoint, which left three greys
+		// identical at #757575 on a monochrome wallpaper.
+		for attempt := 1; attempt <= 24; attempt++ {
+			if !too_close(candidate, out, min_delta) {
+				break
+			}
+			if base.s > 0.15 {
+				// 47° does not divide 360, so repeated steps keep landing somewhere new instead
+				// of cycling through the same handful of hues.
+				candidate = color_from_hsl(base.h + 47.0 * f64(attempt), base.s, base.l)
+			} else {
+				// 0.06..0.94, so a spread grey never becomes pure black or pure white — those
+				// are the background and foreground, and colliding with them is the same bug.
+				lightness := 0.06 + math.fmod(base.l + 0.11 * f64(attempt), 0.88)
+				candidate = color_from_hsl(base.h, base.s, lightness)
+			}
+		}
+
+		// Iterating can still fail to converge: two greys starting at the same lightness walk the
+		// same sequence of slots and keep colliding with each other. Falling back to a slot chosen
+		// by position is what makes distinctness a guarantee rather than a likelihood.
+		if too_close(candidate, out, min_delta) {
+			span := if colors.len > 1 { f64(colors.len - 1) } else { 1.0 }
+			candidate = color_from_hsl(base.h, base.s, 0.12 + 0.76 * (f64(out.len) / span))
+		}
+		out << candidate
+	}
+	return out
+}
+
 // Reorders the extracted pigments. Which pigment ends up first decides the accent, and through
 // it the two greys and both ends of the ramp, so this is the cheapest knob with a visible effect.
 pub fn sort_palette(mut palette []Color, mode string) {
@@ -231,13 +287,15 @@ pub fn get_all_colors(mut scheme Scheme) []Color {
 		black = color_from_rgb(255, 255, 255)
 	}
 
-	prime := gen_prime_six(main_six, 0.1, theme)
+	// Spread after the theme lightening, because that is where the collapse happens: lightening
+	// six pale greys clips every one of them to white.
+	prime := ensure_distinct(gen_prime_six(main_six, 0.1, theme), 10.0)
 	acc := prime[0]
 
 	col0, col15 := get_black_white(acc, 0.08, 0.12, theme)
 	col7, col8 := get_two_grays(acc, 0.2, theme)
 
-	second := gen_second_six(main_six, 0.1, theme)
+	second := ensure_distinct(gen_second_six(main_six, 0.1, theme), 10.0)
 	gradients := gen_gradients(acc, col0, col15, black, white)
 
 	mut colors := []Color{}
