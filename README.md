@@ -192,6 +192,25 @@ the word before them, so `color0` does not become `color_0`.
 
 Inside a loop, `loop_index`, `loop_first` and `loop_last` are available.
 
+### Includes
+
+```
+<* include "partial.conf" *>
+```
+
+The path is resolved **beside the file the include appears in**, not beside wherever lule was
+run from, so a partial next to its template is just its name. The content is spliced into the
+tree rather than rendered separately, which means an include inside a loop can use the loop
+variable:
+
+```
+<* for c in colors *><* include "row.conf" *><* endfor *>
+```
+
+A file may be included any number of times, but a file that ends up including itself is refused
+and reported - including when the cycle only shows up after the paths are resolved, so
+`sub/../sub/x.conf` and `sub/x.conf` are recognised as the same file. Nesting stops at 16 deep.
+
 ### When something is wrong
 
 An unknown name, field or filter is reported on stderr and the placeholder is **left in the

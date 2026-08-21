@@ -1,5 +1,7 @@
 module main
 
+import os
+
 fn ctx() map[string]TplValue {
 	return {
 		'background': TplValue(color_from_hex('#101820'))
@@ -301,4 +303,152 @@ fn test_matugen_case_aliases() {
 	assert render_ok('{{ theme | upper_case }}') == 'DARK'
 	assert render_ok('{{ "LOUD" | lower_case }}') == 'loud'
 	assert render_ok('{{ theme | capitalize }}') == 'Dark'
+}
+
+fn include_dir(name string) string {
+	dir := os.join_path(os.temp_dir(), 'lule_inc_${name}_${os.getpid()}')
+	os.rmdir_all(dir) or {}
+	os.mkdir_all(dir) or { panic(err) }
+	return dir
+}
+
+fn put(dir string, name string, body string) {
+	full := os.join_path(dir, name)
+	os.mkdir_all(os.dir(full)) or {}
+	os.write_file(full, body) or { panic(err) }
+}
+
+fn test_include_pulls_in_another_file() {
+	dir := include_dir('basic')
+	defer {
+		os.rmdir_all(dir) or {}
+	}
+	put(dir, 'partial.conf', 'bg={{ background.hex }}')
+	out, problems := render_in('a <* include "partial.conf" *> b', ctx(), dir)
+	assert problems.len == 0, '${problems}'
+	assert out == 'a bg=#101820 b'
+}
+
+fn test_include_resolves_beside_the_including_file() {
+	// Not relative to the working directory: a template saying `include "partial"` means the one
+	// next to it, wherever lule was run from.
+	dir := include_dir('relative')
+	defer {
+		os.rmdir_all(dir) or {}
+	}
+	put(dir, 'nested/inner.conf', 'inner')
+	put(dir, 'nested/outer.conf', 'outer(<* include "inner.conf" *>)')
+	out, problems := render_in('<* include "nested/outer.conf" *>', ctx(), dir)
+	assert problems.len == 0, '${problems}'
+	assert out == 'outer(inner)'
+}
+
+fn test_included_content_takes_part_in_the_surrounding_block() {
+	// Spliced into the tree rather than rendered on its own, so an include inside a loop sees
+	// the loop variable.
+	dir := include_dir('inloop')
+	defer {
+		os.rmdir_all(dir) or {}
+	}
+	put(dir, 'row.conf', '[{{ c.hex }}]')
+	out, problems :=
+		render_in('<* for c in colors *><* include "row.conf" *><* endfor *>', ctx(), dir)
+	assert problems.len == 0, '${problems}'
+	assert out == '[#111111][#222222][#333333]'
+}
+
+fn test_include_inside_a_conditional() {
+	dir := include_dir('incond')
+	defer {
+		os.rmdir_all(dir) or {}
+	}
+	put(dir, 'dark.conf', 'DARK')
+	put(dir, 'light.conf', 'LIGHT')
+	out, _ := render_in('<* if dark *><* include "dark.conf" *><* else *><* include "light.conf" *><* endif *>',
+		ctx(), dir)
+	assert out == 'DARK'
+}
+
+fn test_a_file_may_be_included_twice() {
+	// The cycle check tracks the current chain, not every file ever seen, so a diamond is fine.
+	dir := include_dir('diamond')
+	defer {
+		os.rmdir_all(dir) or {}
+	}
+	put(dir, 'shared.conf', 'S')
+	put(dir, 'a.conf', 'a<* include "shared.conf" *>')
+	put(dir, 'b.conf', 'b<* include "shared.conf" *>')
+	out, problems := render_in('<* include "a.conf" *><* include "b.conf" *>', ctx(), dir)
+	assert problems.len == 0, '${problems}'
+	assert out == 'aSbS'
+}
+
+fn test_a_self_include_is_refused() {
+	dir := include_dir('selfcycle')
+	defer {
+		os.rmdir_all(dir) or {}
+	}
+	put(dir, 'loop.conf', 'x<* include "loop.conf" *>')
+	out, problems := render_in('<* include "loop.conf" *>', ctx(), dir)
+	assert problems.len == 1, '${problems}'
+	assert problems[0].contains('circular')
+	// The one real level still rendered; only the recursion was cut.
+	assert out == 'x'
+}
+
+fn test_a_longer_cycle_is_refused() {
+	dir := include_dir('abccycle')
+	defer {
+		os.rmdir_all(dir) or {}
+	}
+	put(dir, 'a.conf', 'A<* include "b.conf" *>')
+	put(dir, 'b.conf', 'B<* include "c.conf" *>')
+	put(dir, 'c.conf', 'C<* include "a.conf" *>')
+	out, problems := render_in('<* include "a.conf" *>', ctx(), dir)
+	assert problems.len == 1, '${problems}'
+	assert problems[0].contains('circular')
+	assert out == 'ABC'
+}
+
+fn test_a_cycle_through_a_relative_path_is_still_caught() {
+	// `a/../a.conf` and `a.conf` are the same file; without canonicalising, the chain check
+	// compares two different strings and recurses for ever.
+	dir := include_dir('pathcycle')
+	defer {
+		os.rmdir_all(dir) or {}
+	}
+	put(dir, 'sub/x.conf', 'X<* include "../sub/x.conf" *>')
+	out, problems := render_in('<* include "sub/x.conf" *>', ctx(), dir)
+	assert problems.len == 1, '${problems}'
+	assert problems[0].contains('circular')
+	assert out == 'X'
+}
+
+fn test_a_missing_include_is_reported() {
+	dir := include_dir('missing')
+	defer {
+		os.rmdir_all(dir) or {}
+	}
+	out, problems := render_in('before<* include "nope.conf" *>after', ctx(), dir)
+	assert problems.len == 1
+	assert problems[0].contains('nope.conf')
+	// The rest of the template still renders.
+	assert out == 'beforeafter'
+}
+
+fn test_an_include_with_no_file_named_is_reported() {
+	_, problems := render('<* include *>', ctx())
+	assert problems.len == 1
+}
+
+fn test_include_accepts_either_quote_style() {
+	dir := include_dir('quotes')
+	defer {
+		os.rmdir_all(dir) or {}
+	}
+	put(dir, 'p.conf', 'P')
+	single, _ := render_in("<* include 'p.conf' *>", ctx(), dir)
+	double, _ := render_in('<* include "p.conf" *>', ctx(), dir)
+	bare, _ := render_in('<* include p.conf *>', ctx(), dir)
+	assert single == 'P' && double == 'P' && bare == 'P'
 }

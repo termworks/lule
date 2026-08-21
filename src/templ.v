@@ -4,7 +4,7 @@ import os
 
 pub fn generate_template(original string, replaced string, scheme &Scheme) ! {
 	content := file_to_string(original)!
-	rendered, problems := render(content, template_context(scheme))
+	rendered, problems := render_in(content, template_context(scheme), os.dir(original))
 	for problem in problems {
 		eprintln('${yellow('warning:')} ${original}: ${problem}')
 	}

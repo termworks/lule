@@ -1,6 +1,7 @@
 module main
 
 import math
+import os
 import strings
 
 // What a template expression can evaluate to. Colours stay colours all the way through the
@@ -429,7 +430,30 @@ fn next_block(src string, from int) ?Block {
 }
 
 // Parses until the matching closing tag, returning the nodes and where it stopped.
-fn parse_nodes(src string, from int, stop []string) ([]Node, string, int) {
+// Carried through the parse so `<* include *>` can resolve a path relative to the file it appears
+// in, and so a cycle is caught rather than recursed into for ever.
+struct ParseState {
+mut:
+	dir      string   // the directory of the file currently being parsed
+	chain    []string // the include chain above this point, for cycle detection
+	problems []string
+}
+
+// 16 is far past any sane template and still terminates promptly if the cycle check is ever
+// defeated — by a symlink pair that resolves to two different real paths, say.
+const max_include_depth = 16
+
+// Relative to the including file, not the working directory. A template that says
+// `<* include "partial.conf" *>` means the one next to it, wherever lule happens to be run from.
+fn resolve_include(dir string, path string) string {
+	joined := if os.is_abs_path(path) { path } else { os.join_path(dir, path) }
+	// A canonical form is what makes the cycle check work: `a/../a.tpl` and `a.tpl` are the same
+	// file and have to compare equal. real_path returns its input unchanged when the path does
+	// not exist, which is fine - that case is reported as unreadable a moment later.
+	return os.real_path(joined)
+}
+
+fn parse_nodes(src string, from int, stop []string, mut st ParseState) ([]Node, string, int) {
 	mut nodes := []Node{}
 	mut cursor := from
 
@@ -454,7 +478,7 @@ fn parse_nodes(src string, from int, stop []string) ([]Node, string, int) {
 
 		match block.tag {
 			'if' {
-				body, ended, after := parse_nodes(src, block.finish, ['else', 'endif'])
+				body, ended, after := parse_nodes(src, block.finish, ['else', 'endif'], mut st)
 				mut node := Node{
 					kind: .cond
 					text: block.rest
@@ -462,7 +486,7 @@ fn parse_nodes(src string, from int, stop []string) ([]Node, string, int) {
 				}
 				mut cont := after
 				if ended == 'else' {
-					alt, _, after_else := parse_nodes(src, after, ['endif'])
+					alt, _, after_else := parse_nodes(src, after, ['endif'], mut st)
 					node.alt = alt
 					cont = after_else
 				}
@@ -472,7 +496,7 @@ fn parse_nodes(src string, from int, stop []string) ([]Node, string, int) {
 			'for' {
 				// `for name in iterable`
 				words := block.rest.split(' ').filter(it != '')
-				body, _, after := parse_nodes(src, block.finish, ['endfor'])
+				body, _, after := parse_nodes(src, block.finish, ['endfor'], mut st)
 				nodes << Node{
 					kind: .loop
 					name: if words.len > 0 { words[0] } else { 'item' }
@@ -480,6 +504,32 @@ fn parse_nodes(src string, from int, stop []string) ([]Node, string, int) {
 					body: body
 				}
 				cursor = after
+			}
+			'include' {
+				// Spliced into the tree at parse time rather than rendered separately, so the
+				// included content takes part in whatever `if` or `for` surrounds it.
+				path := unquote(block.rest)
+				resolved := resolve_include(st.dir, path)
+				if path == '' {
+					st.problems << 'include: no file named'
+				} else if st.chain.len >= max_include_depth {
+					st.problems << 'include ${path}: nested more than ${max_include_depth} deep'
+				} else if resolved in st.chain {
+					// The chain, not every file ever seen: a file included twice down two
+					// different branches is fine, a file that includes itself is not.
+					st.problems << 'include ${path}: circular, already including it'
+				} else if content := os.read_file(resolved) {
+					outer_dir := st.dir
+					st.chain << resolved
+					st.dir = os.dir(resolved)
+					inner, _, _ := parse_nodes(content, 0, [], mut st)
+					st.dir = outer_dir
+					st.chain.delete_last()
+					nodes << inner
+				} else {
+					st.problems << 'include ${path}: cannot read ${resolved}'
+				}
+				cursor = block.finish
 			}
 			else {
 				// Not a control tag - leave it in the output rather than swallowing it, so a
@@ -625,12 +675,23 @@ pub fn template_context(scheme &Scheme) map[string]TplValue {
 	return ctx
 }
 
-pub fn render(content string, ctx map[string]TplValue) (string, []string) {
-	nodes, _, _ := parse_nodes(content, 0, [])
+// `dir` is where a relative `<* include *>` is resolved from - the directory of the template
+// being rendered, so an include means the file beside it rather than beside the shell.
+pub fn render_in(content string, ctx map[string]TplValue, dir string) (string, []string) {
+	mut st := ParseState{
+		dir: dir
+	}
+	nodes, _, _ := parse_nodes(content, 0, [], mut st)
 	mut out := strings.new_builder(content.len + 256)
-	mut problems := []string{}
+	// Parse problems come first: an include that could not be read explains the missing text
+	// that any later problem is probably about.
+	mut problems := st.problems.clone()
 	render_nodes(nodes, ctx, mut out, mut problems)
 	return out.str(), problems
+}
+
+pub fn render(content string, ctx map[string]TplValue) (string, []string) {
+	return render_in(content, ctx, '.')
 }
 
 // Filter arguments are consumed as plain values, so this is where quoting is undone — after the
