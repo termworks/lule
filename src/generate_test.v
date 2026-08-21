@@ -1,5 +1,6 @@
 module main
 
+import palette
 import color
 
 fn sample_pigments() []string {
@@ -8,24 +9,24 @@ fn sample_pigments() []string {
 
 fn test_main_six_from_various_palette_sizes() {
 	for size in [0, 1, 2, 5, 6, 8] {
-		mut palette := []color.Color{}
+		mut swatches := []color.Color{}
 		for i in 0 .. size {
-			palette << color.color_from_rgb(u8(30 + i * 20), u8(90 + i * 10), u8(150 - i * 10))
+			swatches << color.color_from_rgb(u8(30 + i * 20), u8(90 + i * 10), u8(150 - i * 10))
 		}
-		assert gen_main_six(palette).len == 6, 'palette of ${size} did not yield six'
+		assert gen_main_six(swatches).len == 6, 'palette of ${size} did not yield six'
 	}
 }
 
 fn test_main_six_drops_extremes() {
 	// Near-black and near-white are filtered before ranking; without that the accent colour ends
 	// up being the background.
-	palette := [
+	swatches := [
 		color.color_from_rgb(2, 2, 2),
 		color.color_from_rgb(253, 253, 253),
 		color.color_from_rgb(63, 81, 181),
 		color.color_from_rgb(233, 30, 99),
 	]
-	six := gen_main_six(palette)
+	six := gen_main_six(swatches)
 	assert six.len == 6
 	for c in six {
 		l := c.to_lab().l
@@ -165,7 +166,7 @@ fn test_kmeans_finds_planted_clusters() {
 		}
 	}
 
-	found := palette_kmeans(pixels, 3, 100)
+	found := palette.palette_kmeans(pixels, 3, 100)
 	assert found.len == 3
 
 	mut total := 0.0
@@ -188,7 +189,7 @@ fn test_kmeans_finds_planted_clusters() {
 }
 
 fn test_kmeans_handles_no_pixels() {
-	assert palette_kmeans([], 8, 10).len == 0
+	assert palette.palette_kmeans([], 8, 10).len == 0
 }
 
 fn test_kmeans_with_a_single_flat_colour() {
@@ -198,7 +199,7 @@ fn test_kmeans_with_a_single_flat_colour() {
 	for _ in 0 .. 50 {
 		pixels << color.color_from_rgb(100, 100, 100).to_lab()
 	}
-	found := palette_kmeans(pixels, 16, 50)
+	found := palette.palette_kmeans(pixels, 16, 50)
 	assert found.len > 0
 	mut total := 0.0
 	for p in found {

@@ -2,9 +2,10 @@ module main
 
 import color
 import os
+import palette
 
 pub fn palette_from_image(image string, backend string) []string {
-	colors_lab := pigments(image, 16, 300, backend) or {
+	colors_lab := palette.pigments(image, 16, 300, backend) or {
 		eprintln('${red_bold('error:')} Problem creating palette -> ${err}')
 		exit(1)
 	}

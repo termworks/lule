@@ -1,4 +1,4 @@
-module main
+module palette
 
 import color
 import math

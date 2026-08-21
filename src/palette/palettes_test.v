@@ -1,4 +1,4 @@
-module main
+module palette
 
 import cmd
 import color
