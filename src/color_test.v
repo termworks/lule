@@ -57,8 +57,10 @@ fn test_delta_e_is_zero_for_identical() {
 	assert close(delta_e_cie76(lab, lab), 0.0, 1e-9)
 	// And non-zero, symmetric, for different colours.
 	other := color_from_hex('#654321').to_lab()
-	assert delta_e_cie76(lab, other) > 0.0
-	assert close(delta_e_cie76(lab, other), delta_e_cie76(other, lab), 1e-9)
+	forward := delta_e_cie76(lab, other)
+	backward := delta_e_cie76(other, lab)
+	assert forward > 0.0
+	assert close(forward, backward, 1e-9), 'asymmetric: ${forward} vs ${backward}, delta ${forward - backward}'
 }
 
 fn test_lighten_and_darken_clamp() {
