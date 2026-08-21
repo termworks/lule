@@ -192,6 +192,31 @@ the word before them, so `color0` does not become `color_0`.
 
 Inside a loop, `loop_index`, `loop_first` and `loop_last` are available.
 
+### Arithmetic
+
+```
+{{ 2 + 3 * 4 }}        14 - precedence, not left to right
+{{ (2 + 3) * 4 }}      20
+{{ 5 / 2 }}            2.5 - whole results print as integers
+{{ count * 2 + 1 }}    names holding numbers work as operands
+```
+
+`+ - * / %` with parentheses and unary minus. Division or modulo by zero is reported rather than
+producing an infinity.
+
+### Ranges
+
+```
+<* for i in 0..5 *>{{ i }}<* endfor *>      01234   - stops before 5, as in Rust
+<* for i in 0..=5 *>{{ i }}<* endfor *>     012345  - inclusive
+<* for i in -2..2 *>{{ i }}<* endfor *>     -2 -1 0 1
+<* for i in 0..count * 2 *>...<* endfor *>  both ends may be expressions
+```
+
+A backwards range such as `10..0` is empty rather than counting down - counting down would be a
+silent guess about what was meant. A range longer than 100000 steps is refused and reported, so a
+mistyped bound says so instead of appearing to hang.
+
 ### Includes
 
 ```

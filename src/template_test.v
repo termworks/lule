@@ -452,3 +452,139 @@ fn test_include_accepts_either_quote_style() {
 	bare, _ := render_in('<* include p.conf *>', ctx(), dir)
 	assert single == 'P' && double == 'P' && bare == 'P'
 }
+
+fn test_arithmetic_basics() {
+	assert render_ok('{{ 2 + 3 }}') == '5'
+	assert render_ok('{{ 10 - 4 }}') == '6'
+	assert render_ok('{{ 6 * 7 }}') == '42'
+	assert render_ok('{{ 9 / 3 }}') == '3'
+	assert render_ok('{{ 7 % 3 }}') == '1'
+}
+
+fn test_arithmetic_precedence() {
+	// The whole reason this is a parser and not another pipeline stage.
+	assert render_ok('{{ 2 + 3 * 4 }}') == '14'
+	assert render_ok('{{ (2 + 3) * 4 }}') == '20'
+	assert render_ok('{{ 2 * 3 + 4 * 5 }}') == '26'
+	assert render_ok('{{ 100 / 10 / 2 }}') == '5'
+	assert render_ok('{{ 2 + 2 * 2 + 2 }}') == '8'
+}
+
+fn test_arithmetic_negatives_and_nesting() {
+	assert render_ok('{{ 0 - 5 }}') == '-5'
+	assert render_ok('{{ 3 * (0 - 2) }}') == '-6'
+	assert render_ok('{{ ((1 + 2) * (3 + 4)) }}') == '21'
+}
+
+fn test_numbers_print_without_trailing_zeros() {
+	assert render_ok('{{ 5 / 2 }}') == '2.5'
+	assert render_ok('{{ 1 / 4 }}') == '0.25'
+	assert render_ok('{{ 4 / 2 }}') == '2'
+}
+
+fn test_a_bare_number_stays_a_number() {
+	// `123456` is also six hex digits. Reading it as a colour would be a surprising way to lose
+	// an arithmetic operand.
+	assert render_ok('{{ 123456 }}') == '123456'
+	assert render_ok('{{ 42 }}') == '42'
+	// But a hex colour is still a colour.
+	assert render_ok('{{ #ff0000 }}') == 'ff0000'
+	assert render_ok('{{ ff0000 }}') == 'ff0000'
+}
+
+fn test_arithmetic_reads_names() {
+	mut c := ctx()
+	c['count'] = TplValue(f64(4))
+	out, problems := render('{{ count * 2 + 1 }}', c)
+	assert problems.len == 0, '${problems}'
+	assert out == '9'
+}
+
+fn test_division_by_zero_is_reported() {
+	_, problems := render('{{ 1 / 0 }}', ctx())
+	assert problems.len == 1
+	assert problems[0].contains('zero')
+
+	_, mod_problems := render('{{ 1 % 0 }}', ctx())
+	assert mod_problems.len == 1
+}
+
+fn test_malformed_arithmetic_is_reported() {
+	for source in ['{{ 1 + }}', '{{ (1 + 2 }}', '{{ 1 + 2) }}', '{{ * 3 }}', '{{ 1 + + }}'] {
+		_, problems := render(source, ctx())
+		assert problems.len >= 1, 'accepted `${source}`'
+	}
+}
+
+fn test_arithmetic_does_not_capture_ordinary_names() {
+	// A name, a hex colour and a quoted string must not be mistaken for arithmetic.
+	assert render_ok('{{ theme }}') == 'dark'
+	assert render_ok('{{ accent.hex }}') == '#3f51b5'
+	assert render_ok('{{ "a-b" }}') == 'a-b'
+}
+
+fn test_range_loops() {
+	// `a..b` stops before b, as in Rust.
+	assert render_ok('<* for i in 0..5 *>{{ i }}<* endfor *>') == '01234'
+	assert render_ok('<* for i in 1..4 *>{{ i }},<* endfor *>') == '1,2,3,'
+}
+
+fn test_inclusive_ranges() {
+	assert render_ok('<* for i in 0..=5 *>{{ i }}<* endfor *>') == '012345'
+	assert render_ok('<* for i in 3..=3 *>{{ i }}<* endfor *>') == '3'
+}
+
+fn test_negative_ranges() {
+	assert render_ok('<* for i in -3..3 *>{{ i }} <* endfor *>') == '-3 -2 -1 0 1 2 '
+}
+
+fn test_a_backwards_range_is_empty() {
+	// Rust's semantics, which is where the `..` spelling comes from. Counting down instead
+	// would be a silent guess about what was meant.
+	assert render_ok('<* for i in 10..0 *>{{ i }}<* endfor *>') == ''
+	assert render_ok('<* for i in 5..5 *>{{ i }}<* endfor *>') == ''
+}
+
+fn test_range_ends_may_be_expressions() {
+	mut c := ctx()
+	c['count'] = TplValue(f64(3))
+	out, problems := render('<* for i in 0..count *>{{ i }}<* endfor *>', c)
+	assert problems.len == 0, '${problems}'
+	assert out == '012'
+
+	out2, problems2 := render('<* for i in 0..count * 2 *>{{ i }}<* endfor *>', c)
+	assert problems2.len == 0, '${problems2}'
+	assert out2 == '012345'
+}
+
+fn test_range_loop_variables() {
+	assert render_ok('<* for i in 0..3 *>{{ loop_index }}<* endfor *>') == '012'
+	out := render_ok('<* for i in 0..3 *>{{ i }}<* if not loop_last *>-<* endif *><* endfor *>')
+	assert out == '0-1-2'
+}
+
+fn test_arithmetic_on_the_loop_variable() {
+	assert render_ok('<* for i in 0..4 *>{{ i * 10 }} <* endfor *>') == '0 10 20 30 '
+}
+
+fn test_a_huge_range_is_refused_rather_than_hanging() {
+	// A template asking for a billion iterations has made a mistake, and saying so beats
+	// appearing to hang.
+	out, problems := render('<* for i in 0..999999999 *>x<* endfor *>', ctx())
+	assert problems.len == 1
+	assert problems[0].contains('more than')
+	assert out == ''
+}
+
+fn test_a_bad_range_end_is_reported() {
+	_, problems := render('<* for i in 0..nope *>x<* endfor *>', ctx())
+	assert problems.len == 1
+
+	_, problems2 := render('<* for i in 0..theme *>x<* endfor *>', ctx())
+	assert problems2.len == 1
+}
+
+fn test_ranges_and_lists_still_coexist() {
+	assert render_ok('<* for c in colors *>{{ c.hex }}<* endfor *>') == '#111111#222222#333333'
+	assert render_ok('<* for i in 0..2 *>{{ i }}<* endfor *>') == '01'
+}

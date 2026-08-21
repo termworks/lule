@@ -8,7 +8,7 @@ import strings
 // pipeline rather than becoming strings at the first opportunity — that is what lets
 // `{{ color1 | lighten: 0.2 | set_alpha: 0.5 }}` mean anything, and it is the difference between
 // a templating engine that understands colour and one doing string substitution.
-type TplValue = Color | []Color | bool | string
+type TplValue = Color | []Color | bool | f64 | string
 
 // A bare `{{ color1 }}` prints **without** the leading hash, because that is what it has always
 // printed and every template in the wild supplies its own: `templates/colors.sh` writes
@@ -36,6 +36,9 @@ fn (v TplValue) display() string {
 				'false'
 			}
 		}
+		f64 {
+			show_number(v)
+		}
 		[]Color {
 			v.map(it.to_hex(false)).join(' ')
 		}
@@ -45,6 +48,7 @@ fn (v TplValue) display() string {
 fn (v TplValue) truthy() bool {
 	return match v {
 		bool { v }
+		f64 { v != 0.0 }
 		string { v != '' && v != 'false' && v != '0' }
 		Color { true }
 		[]Color { v.len > 0 }
@@ -369,6 +373,14 @@ fn eval_expr(expr string, ctx map[string]TplValue) !string {
 	if (trimmed.starts_with('"') && trimmed.ends_with('"') && trimmed.len > 1)
 		|| (trimmed.starts_with("'") && trimmed.ends_with("'") && trimmed.len > 1) {
 		value = TplValue(trimmed[1..trimmed.len - 1])
+	} else if looks_arithmetic(trimmed) {
+		// Checked before name lookup so `loop_index * 2` is arithmetic rather than a search for a
+		// name with a star in it.
+		value = TplValue(eval_arith(trimmed, ctx)!)
+	} else if n := text_as_number(trimmed) {
+		// A bare number, before the hex check: `123456` is six hex digits, and reading it as a
+		// colour rather than a number would be a surprising way to lose an arithmetic operand.
+		value = TplValue(n)
 	} else {
 		parts := trimmed.split('.')
 		name := parts[0]
@@ -494,13 +506,15 @@ fn parse_nodes(src string, from int, stop []string, mut st ParseState) ([]Node, 
 				cursor = cont
 			}
 			'for' {
-				// `for name in iterable`
+				// `for name in iterable`, where the iterable is everything after `in` — not just
+				// the next word. A range end may be an expression, and `0..count * 2` lost its
+				// `* 2` when only one word was taken.
 				words := block.rest.split(' ').filter(it != '')
 				body, _, after := parse_nodes(src, block.finish, ['endfor'], mut st)
 				nodes << Node{
 					kind: .loop
 					name: if words.len > 0 { words[0] } else { 'item' }
-					text: if words.len > 2 { words[2] } else { '' }
+					text: if words.len > 2 { words[2..].join(' ') } else { '' }
 					body: body
 				}
 				cursor = after
@@ -601,6 +615,10 @@ fn render_nodes(nodes []Node, ctx map[string]TplValue, mut out strings.Builder, 
 				render_nodes(if taken { node.body } else { node.alt }, ctx, mut out, mut problems)
 			}
 			.loop {
+				if node.text.contains('..') {
+					render_range(node, ctx, mut out, mut problems)
+					continue
+				}
 				items := ctx[node.text] or {
 					problems << 'for ... in ${node.text}: unknown name'
 					continue
@@ -609,7 +627,7 @@ fn render_nodes(nodes []Node, ctx map[string]TplValue, mut out strings.Builder, 
 					for i, item in items {
 						mut inner := ctx.clone()
 						inner[node.name] = TplValue(item)
-						inner['loop_index'] = TplValue('${i}')
+						inner['loop_index'] = TplValue(f64(i))
 						inner['loop_first'] = TplValue(i == 0)
 						inner['loop_last'] = TplValue(i == items.len - 1)
 						render_nodes(node.body, inner, mut out, mut problems)
@@ -703,4 +721,261 @@ fn unquote(text string) string {
 		return t[1..t.len - 1]
 	}
 	return t
+}
+
+// Numbers print as integers when they are whole, so `{{ 2 + 3 }}` is `5` rather than `5.00` and
+// a loop counter reads like a counter. Fractions keep two places and lose trailing zeros.
+fn show_number(x f64) string {
+	if x == math.trunc(x) && math.abs(x) < 1.0e15 {
+		return '${i64(x)}'
+	}
+	return '${x:.6f}'.trim_right('0').trim_right('.')
+}
+
+// Arithmetic, as a recursive-descent parser rather than another pipeline stage: `2 + 3 * 4` has
+// to be 14, and precedence is not something a left-to-right pipeline can express.
+//
+//   expr   := term (('+' | '-') term)*
+//   term   := factor (('*' | '/' | '%') factor)*
+//   factor := '-' factor | '(' expr ')' | number | name
+struct Arith {
+	src string
+	ctx map[string]TplValue
+mut:
+	pos int
+}
+
+fn (mut a Arith) skip_spaces() {
+	for a.pos < a.src.len && a.src[a.pos] == ` ` {
+		a.pos++
+	}
+}
+
+fn (mut a Arith) peek() u8 {
+	a.skip_spaces()
+	return if a.pos < a.src.len { a.src[a.pos] } else { 0 }
+}
+
+fn (mut a Arith) expr() !f64 {
+	mut left := a.term()!
+	for {
+		op := a.peek()
+		if op != `+` && op != `-` {
+			break
+		}
+		a.pos++
+		right := a.term()!
+		left = if op == `+` { left + right } else { left - right }
+	}
+	return left
+}
+
+fn (mut a Arith) term() !f64 {
+	mut left := a.factor()!
+	for {
+		op := a.peek()
+		if op != `*` && op != `/` && op != `%` {
+			break
+		}
+		a.pos++
+		right := a.factor()!
+		match op {
+			`*` {
+				left *= right
+			}
+			`/` {
+				if right == 0.0 {
+					return error('division by zero')
+				}
+				left /= right
+			}
+			else {
+				if right == 0.0 {
+					return error('modulo by zero')
+				}
+				left = math.fmod(left, right)
+			}
+		}
+	}
+	return left
+}
+
+fn (mut a Arith) factor() !f64 {
+	ch := a.peek()
+	if ch == 0 {
+		return error('expression ends early')
+	}
+	if ch == `-` {
+		a.pos++
+		return -a.factor()!
+	}
+	if ch == `+` {
+		a.pos++
+		return a.factor()!
+	}
+	if ch == `(` {
+		a.pos++
+		inner := a.expr()!
+		if a.peek() != `)` {
+			return error('missing `)`')
+		}
+		a.pos++
+		return inner
+	}
+	if ch.is_digit() || ch == `.` {
+		start := a.pos
+		for a.pos < a.src.len && (a.src[a.pos].is_digit() || a.src[a.pos] == `.`) {
+			a.pos++
+		}
+		return a.src[start..a.pos].f64()
+	}
+	if ch.is_letter() || ch == `_` {
+		start := a.pos
+		for a.pos < a.src.len && (a.src[a.pos].is_alnum() || a.src[a.pos] == `_`) {
+			a.pos++
+		}
+		name := a.src[start..a.pos]
+		value := a.ctx[name] or { return error('unknown name `${name}`') }
+		return match value {
+			f64 {
+				value
+			}
+			// A name holding text still counts if the text is a number, which is what makes a
+			// loop counter usable in arithmetic whatever it was stored as.
+			string {
+				if n := text_as_number(value) {
+					n
+				} else {
+					error('`${name}` is not a number')
+				}
+			}
+			else {
+				error('`${name}` is not a number')
+			}
+		}
+	}
+	return error('cannot read `${a.src[a.pos..]}`')
+}
+
+fn text_as_number(text string) ?f64 {
+	trimmed := text.trim_space()
+	if trimmed == '' {
+		return none
+	}
+	mut seen_digit := false
+	for i, ch in trimmed {
+		if ch.is_digit() {
+			seen_digit = true
+		} else if !(ch == `.` || ((ch == `-` || ch == `+`) && i == 0)) {
+			return none
+		}
+	}
+	return if seen_digit { trimmed.f64() } else { none }
+}
+
+// Whether this looks like arithmetic rather than a name, a hex colour or a literal. An operator
+// at position zero does not count: `-5` is a number, and `#ff0000` must stay a colour.
+fn looks_arithmetic(expr string) bool {
+	mut depth := 0
+	for i, ch in expr {
+		if ch == `(` {
+			depth++
+			return true
+		}
+		if ch == `)` {
+			depth--
+		}
+		if i > 0 && ch in [`+`, `*`, `/`, `%`] {
+			return true
+		}
+		// A `-` is only an operator with something before it; and not inside a name like
+		// `some-name`, which has no spaces around it.
+		if i > 0 && ch == `-` && expr[i - 1] == ` ` {
+			return true
+		}
+	}
+	return depth != 0
+}
+
+fn eval_arith(expr string, ctx map[string]TplValue) !f64 {
+	mut a := Arith{
+		src: expr
+		ctx: ctx
+	}
+	value := a.expr()!
+	a.skip_spaces()
+	if a.pos < a.src.len {
+		return error('unexpected `${a.src[a.pos..]}`')
+	}
+	return value
+}
+
+// A template that asks for a billion iterations has made a mistake, and the useful response is
+// to say so rather than to appear to hang.
+const max_range_steps = 100000
+
+// `a..b` stops before b and `a..=b` includes it, following Rust — which is where the `..`
+// spelling comes from, and the expectation a template author arrives with.
+//
+// Both ends are full expressions, so `0..count - 1` and `0..(n * 2)` work.
+fn render_range(node Node, ctx map[string]TplValue, mut out strings.Builder, mut problems []string) {
+	idx := node.text.index('..') or { return }
+	inclusive := node.text.len > idx + 2 && node.text[idx + 2] == `=`
+	from_text := node.text[..idx].trim_space()
+	to_text := node.text[idx + if inclusive { 3 } else { 2 }..].trim_space()
+
+	from := eval_range_end(from_text, ctx) or {
+		problems << 'for ... in ${node.text}: ${err}'
+		return
+	}
+	to := eval_range_end(to_text, ctx) or {
+		problems << 'for ... in ${node.text}: ${err}'
+		return
+	}
+
+	start := i64(from)
+	stop := if inclusive { i64(to) + 1 } else { i64(to) }
+	if stop <= start {
+		// Empty, as `10..0` is in Rust. Counting downwards instead would be a guess about what
+		// was meant, and a silent one.
+		return
+	}
+	if stop - start > max_range_steps {
+		problems << 'for ... in ${node.text}: ${stop - start} steps, more than ${max_range_steps}'
+		return
+	}
+
+	total := int(stop - start)
+	for offset in 0 .. total {
+		value := start + offset
+		mut inner := ctx.clone()
+		inner[node.name] = TplValue(f64(value))
+		inner['loop_index'] = TplValue(f64(offset))
+		inner['loop_first'] = TplValue(offset == 0)
+		inner['loop_last'] = TplValue(offset == total - 1)
+		render_nodes(node.body, inner, mut out, mut problems)
+	}
+}
+
+fn eval_range_end(text string, ctx map[string]TplValue) !f64 {
+	if text == '' {
+		return error('a range needs both ends')
+	}
+	if n := text_as_number(text) {
+		return n
+	}
+	if n := eval_arith(text, ctx) {
+		return n
+	}
+	// A plain name is not arithmetic, so fall back to reading it out of the context.
+	value := ctx[text] or { return error('unknown name `${text}`') }
+	if value is f64 {
+		return value
+	}
+	if value is string {
+		if n := text_as_number(value) {
+			return n
+		}
+	}
+	return error('`${text}` is not a number')
 }
