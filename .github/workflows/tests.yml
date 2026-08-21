@@ -8,20 +8,61 @@ on:
 
 jobs:
   build:
-
-    runs-on: ubuntu-latest
+    name: linux-${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Both arches are released, so both are built here. An arm64 break that only shows up
+          # at release time is a break found after the tag exists.
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Install V
-      uses: vlang/setup-v@v1.4
-      with:
-        check-latest: true
-    - name: Build
-      run: v -prod src/ -o target/lule
-    - name: Vet
-      run: v vet src/
-    - name: Smoke test
-      run: |
-        LULE_A=$(mktemp -d) LULE_S= target/lule create --image=resources/theme_dark.png -- set
-        LULE_A=$(mktemp -d) LULE_S= target/lule --version
+      - uses: actions/checkout@v4
+
+      - name: Install V
+        uses: vlang/setup-v@v1.7
+        with:
+          check-latest: true
+
+      - name: Formatting
+        run: v fmt -verify src/
+
+      - name: Vet
+        run: v vet src/
+
+      - name: Build
+        run: |
+          mkdir -p target
+          v -prod -cflags -static src/ -o target/lule
+
+      - name: Verify it is really static
+        run: |
+          set -euo pipefail
+          if readelf -l target/lule | grep -q 'program interpreter'; then
+            echo "::error::target/lule requests a dynamic loader; it is not static"; exit 1
+          fi
+          if readelf -d target/lule 2>/dev/null | grep -q 'NEEDED'; then
+            echo "::error::target/lule has NEEDED entries; it is not static"; exit 1
+          fi
+
+      - name: V tests
+        run: v test src/
+
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          cache="$(mktemp -d)"
+          export LULE_A="$cache" LULE_S=""
+          ./target/lule --version
+          ./target/lule create --image=resources/theme_dark.png -- set
+          count="$(grep -c . "$cache/colors")"
+          [ "$count" = "256" ] || { echo "::error::expected 256 colours, got $count"; exit 1; }
+          ./target/lule create --image=resources/theme_light.png --theme=light -- set
+          ./target/lule create -- regen
+          ./target/lule colors -- ansii | head -3
+          echo "smoke: $count colours"

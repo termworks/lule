@@ -3,41 +3,137 @@ name: release
 on:
   release:
     types: [created]
+  # So a failed or missing asset can be rebuilt without cutting another tag.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to build and upload assets for'
+        required: true
+
+permissions:
+  contents: write
 
 jobs:
-  release:
-    name: release ${{ matrix.target }}
-    runs-on: ubuntu-latest
+  build:
+    name: linux-${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        target: [x86_64-linux-static]
+        include:
+          # Both native. V compiles to C and then links, so cross-compiling means carrying a
+          # cross toolchain and a foreign libc.a; GitHub's arm64 runners are free for public
+          # repositories, which makes the native build both simpler and the one actually tested.
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Install V
-        uses: vlang/setup-v@v1.4
+        uses: vlang/setup-v@v1.7
         with:
           check-latest: true
 
+      - name: Resolve version
+        id: meta
+        run: |
+          set -euo pipefail
+          tag='${{ github.event.release.tag_name || inputs.tag }}'
+          version="$(sed -nE "s/^[[:space:]]*version:[[:space:]]*'([^']+)'.*/\1/p" v.mod | head -1)"
+          [ -n "$version" ] || { echo "no version in v.mod"; exit 1; }
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "name=lule-${version}-linux-${{ matrix.arch }}" >> "$GITHUB_OUTPUT"
+
       - name: Build static binary
         run: |
+          set -euo pipefail
           mkdir -p target
+          # libc.a comes from libc6-dev, which the runner images already carry. Checked rather
+          # than assumed, because without it the failure is a linker error about -lc from inside
+          # a C file V generated, which reads as a compiler bug rather than a missing package.
+          if ! ls /usr/lib/*/libc.a >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y libc6-dev
+          fi
           v -prod -cflags -static src/ -o target/lule
-          file target/lule | grep -q "statically linked" || { echo "not static"; exit 1; }
-          strip target/lule
-          ls -la target/lule
+
+      - name: Verify it is really static
+        run: |
+          set -euo pipefail
+          # `ldd` is not enough: it prints "statically linked" for a binary that still carries an
+          # INTERP and will not start. The ELF is the thing making the claim, so ask the ELF.
+          if readelf -l target/lule | grep -q 'program interpreter'; then
+            echo "::error::target/lule requests a dynamic loader; it is not static"; exit 1
+          fi
+          if readelf -d target/lule 2>/dev/null | grep -q 'NEEDED'; then
+            echo "::error::target/lule has NEEDED entries; it is not static"; exit 1
+          fi
+          file target/lule
+          echo "static: no INTERP, no NEEDED"
+
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          cache="$(mktemp -d)"
+          # LULE_S names the caller's real colour-applying script. A runner has none, but an
+          # empty value is the explicit statement that none should run.
+          export LULE_A="$cache" LULE_S=""
+          ./target/lule --version
+          ./target/lule create --image=resources/theme_dark.png -- set
+          count="$(grep -c . "$cache/colors")"
+          [ "$count" = "256" ] || { echo "::error::expected 256 colours, got $count"; exit 1; }
+          grep -qE '^#[0-9a-f]{6}$' "$cache/colors" || { echo "::error::not hex colours"; exit 1; }
+          echo "smoke: $count colours"
 
       - name: Package
         run: |
-          tar -czf lule_${{ matrix.target }}.tar.gz -C target lule
-          zip -j lule_${{ matrix.target }}.zip target/lule
+          set -euo pipefail
+          strip target/lule
+          dist="${{ steps.meta.outputs.name }}"
+          mkdir -p "dist/$dist"
+          cp target/lule "dist/$dist/"
+          cp README.md LICENSE.md CHANGELOG.md "dist/$dist/" 2>/dev/null || true
+          # tar.gz only. A zip beside it would need `zip` present on both runner images for no
+          # gain — this is a Linux-only release, and tar is what unpacks it.
+          tar -czf "dist/${dist}.tar.gz" -C dist "$dist"
+          ( cd dist && sha256sum "${dist}.tar.gz" > "${dist}.sha256" )
+          ls -la dist/
 
-      - name: Upload to release
-        uses: softprops/action-gh-release@v2
+      - uses: actions/upload-artifact@v4
         with:
-          files: |
-            lule_${{ matrix.target }}.tar.gz
-            lule_${{ matrix.target }}.zip
+          name: ${{ steps.meta.outputs.name }}
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+          retention-days: 7
+
+  publish:
+    name: publish assets
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: One checksum file for every asset
+        run: |
+          set -euo pipefail
+          cd dist
+          cat ./*.sha256 > SHA256SUMS
+          rm -f ./*.sha256
+          sha256sum -c SHA256SUMS
+          ls -la
+
+      - name: Upload to the release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag='${{ github.event.release.tag_name || inputs.tag }}'
+          gh release upload "$tag" dist/SHA256SUMS dist/*.tar.gz --clobber --repo '${{ github.repository }}'
