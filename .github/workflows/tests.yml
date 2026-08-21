@@ -27,7 +27,10 @@ jobs:
       - name: Install V
         uses: vlang/setup-v@v1.7
         with:
-          check-latest: true
+          # Pinned, not `check-latest`. V's formatter changes between releases, so chasing
+          # latest means an upstream V release fails `v fmt -verify` on a commit that changed
+          # nothing. The version here matches the one the flake pins through flake.lock.
+          version-file: .v-version
 
       - name: Formatting
         run: v fmt -verify src/
