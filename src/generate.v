@@ -187,8 +187,7 @@ pub fn get_all_colors(mut scheme Scheme) []Color {
 		hue := rand.f64() * 360.0
 		saturation := 0.2 + 0.6 * rand.f64()
 		lightness := 0.3 + 0.4 * rand.f64()
-		colors << gen_shades([col0, color_from_hsl(hue, saturation, lightness), col15],
-			12)
+		colors << gen_shades([col0, color_from_hsl(hue, saturation, lightness), col15], 12)
 	}
 
 	if scheme.norandom {
@@ -196,8 +195,7 @@ pub fn get_all_colors(mut scheme Scheme) []Color {
 			hue := rand.f64() * 360.0
 			saturation := 0.2 + 0.6 * rand.f64()
 			lightness := 0.3 + 0.4 * rand.f64()
-			colors << gen_shades([col0, color_from_hsl(hue, saturation, lightness), col15],
-				12)
+			colors << gen_shades([col0, color_from_hsl(hue, saturation, lightness), col15], 12)
 		}
 	} else {
 		lightish := gradients[2]

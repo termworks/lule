@@ -140,11 +140,24 @@ fn main() {
 	}
 
 	match a.subcommand {
-		'create' { cmd_create(a, mut scheme) }
-		'colors' { cmd_colors(a, mut scheme) }
-		'config' { cmd_config(a, mut scheme) }
-		'daemon' { concatinate(a, mut scheme); run_daemon(a, mut scheme) }
-		'test' { cmd_test(a, mut scheme) }
-		else { print_help(read_logo()) }
+		'create' {
+			cmd_create(a, mut scheme)
+		}
+		'colors' {
+			cmd_colors(a, mut scheme)
+		}
+		'config' {
+			cmd_config(a, mut scheme)
+		}
+		'daemon' {
+			concatinate(a, mut scheme)
+			run_daemon(a, mut scheme)
+		}
+		'test' {
+			cmd_test(a, mut scheme)
+		}
+		else {
+			print_help(read_logo())
+		}
 	}
 }

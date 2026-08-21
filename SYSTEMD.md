@@ -13,9 +13,12 @@ The main issue preventing lule from running in systemd/background was the TTY de
 ### 1. Install the Binary
 
 ```bash
-make build
-sudo cp target/release/lule /usr/local/bin/
+nix develop --command oslo make build
+sudo cp target/lule /usr/local/bin/
 ```
+
+The build needs no runtime: `target/lule` is statically linked. Without nix, any V toolchain and a
+C compiler will do — `v -prod -cflags -static src/ -o target/lule`.
 
 ### 2. Create Required Directories
 

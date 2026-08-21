@@ -226,8 +226,7 @@ pub fn (c Color) mix_rgb(other Color, f f64) Color {
 pub fn (c Color) mix_lab(other Color, f f64) Color {
 	a := c.to_lab()
 	b := other.to_lab()
-	return color_from_lab(a.l + (b.l - a.l) * f, a.a + (b.a - a.a) * f, a.b + (b.b - a.b) * f,
-		1.0)
+	return color_from_lab(a.l + (b.l - a.l) * f, a.a + (b.a - a.a) * f, a.b + (b.b - a.b) * f, 1.0)
 }
 
 // CIE76 colour difference

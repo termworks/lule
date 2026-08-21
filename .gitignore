@@ -5,3 +5,5 @@ devbox.lock
 .vscode
 .devbox
 *.tmp.c
+result
+result-*
