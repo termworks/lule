@@ -3,6 +3,7 @@ name: release
 on:
   release:
     types: [created]
+
 jobs:
   release:
     name: release ${{ matrix.target }}
@@ -10,18 +11,33 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [x86_64-unknown-linux-musl]
+        target: [x86_64-linux-static]
     steps:
       - uses: actions/checkout@v4
-      - name: Install Rust nightly
-        uses: dtolnay/rust-toolchain@nightly
-      - name: Compile and release
-        id: compile
-        uses: rust-build/rust-build.action@v1.4.3
+
+      - name: Install V
+        uses: vlang/setup-v@v1.4
+        with:
+          check-latest: true
+
+      - name: Build static binary
+        run: |
+          mkdir -p target
+          v -prod -cflags -static src/ -o target/lule
+          file target/lule | grep -q "statically linked" || { echo "not static"; exit 1; }
+          strip target/lule
+          ls -la target/lule
+
+      - name: Package
+        run: |
+          tar -czf lule_${{ matrix.target }}.tar.gz -C target lule
+          zip -j lule_${{ matrix.target }}.zip target/lule
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            lule_${{ matrix.target }}.tar.gz
+            lule_${{ matrix.target }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          TOOLCHAIN_VERSION : nightly
-          RUSTTARGET: ${{ matrix.target }}
-          ARCHIVE_TYPES: "zip tar.gz"
-          # ARCHIVE_NAME: "roc_${{ matrix.target }}"

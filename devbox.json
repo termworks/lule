@@ -1,8 +1,8 @@
 {
   "packages": [
-    "rustc@latest",
-    "cargo@latest",
-    "rust-analyzer@latest"
+    "vlang@latest",
+    "gcc@latest",
+    "glibc@latest"
   ],
   "shell": {
     "init_hook": [
@@ -10,7 +10,7 @@
     ],
     "scripts": {
       "test": [
-        "echo \"Error: no test specified\" && exit 1"
+        "make test"
       ]
     }
   }

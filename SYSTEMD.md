@@ -13,7 +13,7 @@ The main issue preventing lule from running in systemd/background was the TTY de
 ### 1. Install the Binary
 
 ```bash
-cargo build --release
+make build
 sudo cp target/release/lule /usr/local/bin/
 ```
 
