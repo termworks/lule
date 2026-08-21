@@ -173,10 +173,12 @@ Values stay colours between stages, so filters chain:
 
 A literal works as the input too: `{{ "#3f51b5" | lighten: 0.1 }}`.
 
-The case filters take the input apart whatever convention it arrived in, so `HTTPServer`,
-`http-server` and `http server` all snake_case to `http_server`. Digits stay with their word, so
-`color0` does not become `color_0`. matugen's `upper_case` and `lower_case` are accepted as
-aliases for `upper` and `lower`.
+The case filters take the input apart whatever convention it arrived in, so `helloWorld`,
+`hello-world` and `HELLO_WORLD` all snake_case to `hello_world`. A run of capitals stays one word
+until the last of them (`XMLHttpRequest` becomes `xml_http_request`), and digits stay attached to
+the word before them, so `color0` does not become `color_0`.
+
+`upper_case`, `lower_case` and the `_case` names are matugen's spellings and work here too.
 
 ### Conditionals and loops
 
