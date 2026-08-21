@@ -45,6 +45,36 @@ v -prod -cflags -static src/ -o target/lule
 
 `oslo make` lists the rest — `dev`, `test`, `verify`, `install`, `docs`, `release`.
 
+## Configuration
+
+Everything below can live in `~/.config/lule/config.toml` (or `$LULE_C/config.toml`) instead of
+being repeated on every command line. `resources/config.example.toml` is a commented starting
+point.
+
+```toml
+[settings]
+wallpaper = "~/.wallpaper"
+theme = "dark"
+contrast = "aa"
+
+[templates.kitty]
+input  = "~/.config/lule/templates/kitty.conf"
+output = "~/.config/kitty/colors.conf"
+
+[templates.waybar]
+input  = "~/.config/lule/templates/waybar.css"
+output = "~/.config/waybar/colors.css"
+
+[scripts]
+after = ["~/.local/bin/reload-colors"]
+```
+
+Precedence runs **file, then environment, then flags** - a flag always wins. `~` is expanded by
+lule, since nothing in a toml file passes through a shell. A missing config is not an error; a
+malformed one is.
+
+`--pattern` and `--script` *add to* what the file lists rather than replacing it.
+
 ## Environment
 
 | variable | what |

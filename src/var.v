@@ -46,11 +46,16 @@ fn temp_concatinate(mut scheme Scheme) {
 			scheme.cache = cache
 		}
 	}
-	// Both are per-invocation choices, not settings. Persisting the named scheme meant one
+	// Per-invocation choices, not settings. Persisting the named scheme meant one
 	// `--scheme=gruvbox` poisoned the temp scheme, and every later `lule create` — with no
 	// --scheme at all — failed looking for it, until /tmp/lule_scheme was deleted by hand.
+	//
+	// Templates are cleared for the same reason: they are re-supplied by config.toml and by
+	// --pattern on every run, so keeping the previous run's set only lets stale paths pile up
+	// and get rewritten for ever.
 	scheme.image = ''
 	scheme.scheme = ''
+	scheme.patterns = []
 }
 
 // The palette-tuning flags, shared by `create` and `test` so a setting can be previewed with the
@@ -75,12 +80,7 @@ fn tuning_concatinate(a &Args, mut scheme Scheme) {
 		scheme.seed = v.int()
 	}
 	if v := a.flags['contrast'] {
-		scheme.contrast = match v.to_lower() {
-			'aa' { contrast_aa }
-			'aaa' { contrast_aaa }
-			'none', 'off', '0' { -1.0 }
-			else { v.f64() }
-		}
+		scheme.contrast = parse_contrast(v)
 	}
 	if a.present['norandom'] {
 		scheme.norandom = true
@@ -94,12 +94,17 @@ fn args_concatinate(a &Args, mut scheme Scheme) {
 		scheme.scripts = scripts
 	}
 
+	// Added to whatever config.toml already listed, rather than replacing it — the same way
+	// --script adds to $LULE_S. Replacing meant a one-off `--pattern` silently switched off every
+	// template the config file had set up, so the colours changed and nothing else did.
 	if a.multi['pattern'].len > 0 {
-		mut patterns := []Pattern{}
+		mut patterns := scheme.patterns.clone()
 		for val in a.multi['pattern'] {
 			parts := val.split(':')
 			if parts.len == 2 {
 				patterns << Pattern{parts[0], parts[1]}
+			} else {
+				eprintln('${yellow('warning:')} --pattern=${val} is not IN:OUT')
 			}
 		}
 		scheme.patterns = patterns
@@ -236,6 +241,13 @@ fn pipe_concatinate(mut scheme Scheme) {
 pub fn concatinate(a &Args, mut scheme Scheme, needs_image bool) {
 	temp_concatinate(mut scheme)
 	defs_concatinate(mut scheme)
+	// Where the config lives is settled before it is read, because that is the one thing the
+	// file cannot tell us. $LULE_C and --configs are the only two settings resolved this early;
+	// everything else the environment and the flags say is applied afterwards, on top.
+	locate_config(a, mut scheme)
+	// Lowest of the three a user controls: the file is overridden by the environment, and both
+	// by a flag on the command line.
+	config_concatinate(mut scheme)
 	envi_concatinate(mut scheme)
 	args_concatinate(a, mut scheme)
 	pipe_concatinate(mut scheme)

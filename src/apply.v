@@ -51,6 +51,13 @@ pub fn write_colors(mut scheme Scheme, old bool) {
 	write_temp(scheme)
 	write_cache(scheme)
 	write_cache_json(scheme, values)
+	// Before the scripts, not after: a script's usual job is to reload the programs whose config
+	// these templates just rewrote, and reloading them before the rewrite reloads the old colours.
+	//
+	// This was only ever called from the hidden `test` subcommand, so `--pattern` silently did
+	// nothing during normal use - and the config file's whole purpose is templates on `create`.
+	pattern_generation(scheme)
+
 	if scheme.scripts.len > 0 {
 		command_execution(scheme)
 	}
