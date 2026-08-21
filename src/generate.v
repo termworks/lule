@@ -147,15 +147,82 @@ pub fn generate_defined_colors(theme bool) []Color {
 	return colors
 }
 
+// Seeds the generator, or leaves it alone when no seed was asked for. The second word is the
+// first mixed with the golden-ratio constant: the generator wants two, and handing it a zero
+// alongside a small seed makes neighbouring seeds produce visibly related streams.
+pub fn seed_rand(seed int) {
+	if seed == 0 {
+		return
+	}
+	lo := u32(seed)
+	rand.seed([lo, lo ^ u32(0x9e3779b9)])
+}
+
+// Reorders the extracted pigments. Which pigment ends up first decides the accent, and through
+// it the two greys and both ends of the ramp, so this is the cheapest knob with a visible effect.
+pub fn sort_palette(mut palette []Color, mode string) {
+	match mode {
+		'hue' { palette.sort(a.to_lch().h < b.to_lch().h) }
+		'light' { palette.sort(a.to_lab().l < b.to_lab().l) }
+		'dark' { palette.sort(a.to_lab().l > b.to_lab().l) }
+		'chroma' { palette.sort(a.to_lch().c > b.to_lch().c) }
+		else {} // '' and 'none' keep k-means' own order, which is by dominance
+	}
+}
+
+// Applied to the pigments rather than to the finished 256, so the scheme stays internally
+// consistent: the background is still derived from the accent, the ramp still runs dark to light,
+// and nothing has to be clamped back into place afterwards.
+pub fn adjust_palette(palette []Color, scheme &Scheme) []Color {
+	mut out := []Color{}
+	for c in palette {
+		hsl := c.to_hsl()
+		mut h := hsl.h
+		mut s := hsl.s
+		mut l := hsl.l
+		if scheme.hue != 0.0 {
+			h += scheme.hue
+		}
+		// A multiplier, so 0 leaves the colour alone and -1 takes it to grey.
+		if scheme.saturation != 0.0 {
+			s = clamp01(s * (1.0 + scheme.saturation))
+		}
+		if scheme.illumination != 0.0 {
+			l = clamp01(l + scheme.illumination)
+		}
+		out << color_from_hsl(h, s, l)
+	}
+
+	// Pulling every pigment toward the first one trades variety for cohesion.
+	if scheme.blend > 0.0 && out.len > 1 {
+		anchor := out[0]
+		for i := 1; i < out.len; i++ {
+			out[i] = out[i].mix_lab(anchor, clamp01(scheme.blend))
+		}
+	}
+	return out
+}
+
 pub fn get_all_colors(mut scheme Scheme) []Color {
 	theme := scheme.is_dark()
+
+	seed_rand(scheme.seed)
 
 	mut palette := []Color{}
 	for c in scheme.pigments {
 		palette << color_from_hex(c)
 	}
 
-	main_six := gen_main_six(palette)
+	// Both applied to the chosen six, not to the pigments going in.
+	//
+	// gen_main_six filters to mid lightness and then re-sorts by chroma, so tuning the input made
+	// both knobs behave chaotically: raising --illumination pushed pigments past the lightness cut
+	// and changed *which* colours were picked, and a --sort on the way in was overwritten by the
+	// internal sort on the way out. Measured, --illumination=0.3 came out darker than no flag at
+	// all. Adjusting after selection keeps the choice fixed and the knobs monotonic.
+	mut main_six := gen_main_six(palette)
+	sort_palette(mut main_six, scheme.sort)
+	main_six = adjust_palette(main_six, scheme)
 
 	mut black := color_from_rgb(0, 0, 0)
 	mut white := color_from_rgb(255, 255, 255)

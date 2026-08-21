@@ -49,6 +49,32 @@ fn temp_concatinate(mut scheme Scheme) {
 	scheme.image = ''
 }
 
+// The palette-tuning flags, shared by `create` and `test` so a setting can be previewed with the
+// command that draws it and then applied with the command that saves it.
+fn tuning_concatinate(a &Args, mut scheme Scheme) {
+	if v := a.flags['saturation'] {
+		scheme.saturation = v.f64()
+	}
+	if v := a.flags['illumination'] {
+		scheme.illumination = v.f64()
+	}
+	if v := a.flags['hue'] {
+		scheme.hue = v.f64()
+	}
+	if v := a.flags['blend'] {
+		scheme.blend = v.f64()
+	}
+	if v := a.flags['sort'] {
+		scheme.sort = v
+	}
+	if v := a.flags['seed'] {
+		scheme.seed = v.int()
+	}
+	if a.present['norandom'] {
+		scheme.norandom = true
+	}
+}
+
 fn args_concatinate(a &Args, mut scheme Scheme) {
 	if a.multi['script'].len > 0 {
 		mut scripts := scheme.scripts.clone()
@@ -91,6 +117,7 @@ fn args_concatinate(a &Args, mut scheme Scheme) {
 			if v := a.flags['scheme'] {
 				scheme.scheme = v
 			}
+			tuning_concatinate(a, mut scheme)
 		}
 		'config' {
 			if v := a.flags['theme'] {
@@ -112,6 +139,7 @@ fn args_concatinate(a &Args, mut scheme Scheme) {
 			if v := a.flags['theme'] {
 				scheme.theme = v
 			}
+			tuning_concatinate(a, mut scheme)
 		}
 		else {}
 	}

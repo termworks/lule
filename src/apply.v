@@ -3,6 +3,10 @@ module main
 import os
 
 pub fn write_colors(mut scheme Scheme, old bool) {
+	// Seeded here as well as in get_all_colors, because k-means++ picks its starting centres at
+	// random: without this the extracted pigments differ run to run and the seed only fixes half
+	// the pipeline.
+	seed_rand(scheme.seed)
 	if old {
 		if scheme.cache != '' {
 			scheme.pigments = lines_to_vec(os.join_path(scheme.cache, 'palette'))

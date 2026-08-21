@@ -26,7 +26,7 @@ pub mut:
 	saturation   f64
 	illumination f64
 	hue          f64
-	difference   f64
+	seed         int
 	blend        f64
 	norandom     bool
 }
@@ -82,8 +82,8 @@ pub fn (mut s Scheme) modi(new Scheme) {
 	if new.hue != 0.0 {
 		s.hue = new.hue
 	}
-	if new.difference != 0.0 {
-		s.difference = new.difference
+	if new.seed != 0 {
+		s.seed = new.seed
 	}
 	if new.blend != 0.0 {
 		s.blend = new.blend

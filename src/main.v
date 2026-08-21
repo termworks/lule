@@ -40,6 +40,13 @@ fn cmd_colors(a &Args, mut scheme Scheme) {
 	cols, rows := term_size()
 	action := if a.action == '' { 'ansii' } else { a.action }
 
+	// Ahead of the tty check, because being piped is exactly when json is asked for. Everything
+	// below this line either draws or depends on a terminal.
+	if action == 'json' {
+		println(output_to_json(scheme, true))
+		return
+	}
+
 	if !is_tty_stdout() {
 		for color in scheme.colors {
 			println(color.to_hex(true))
