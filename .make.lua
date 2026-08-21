@@ -28,7 +28,7 @@ local DEV_BIN = "target/" .. NAME .. "-dev"
 local PREFIX = os.getenv("PREFIX") or (os.getenv("HOME") .. "/.local")
 
 -- Every `.v` the build depends on, for the recipes that declare staleness.
-local SOURCES = { "src/**/*.v", "v.mod" }
+local SOURCES = { "src/*.v", "src/**/*.v", "v.mod" }
 
 -- `-static` needs libc.a, which nixpkgs keeps in glibc's `static` output. The dev shell exports
 -- where that is; outside it, plain `-static` is right on any distribution that ships libc.a in

@@ -3,7 +3,7 @@ module main
 import os
 
 fn cmd_create(a &Args, mut scheme Scheme) {
-	concatinate(a, mut scheme)
+	concatinate(a, mut scheme, a.action != 'regen')
 	match a.action {
 		'set' { write_colors(mut scheme, false) }
 		'regen' { write_colors(mut scheme, true) }
@@ -12,7 +12,7 @@ fn cmd_create(a &Args, mut scheme Scheme) {
 }
 
 fn cmd_colors(a &Args, mut scheme Scheme) {
-	concatinate(a, mut scheme)
+	concatinate(a, mut scheme, a.present['g'])
 	scheme.scripts = []
 
 	if a.present['g'] {
@@ -76,7 +76,7 @@ fn pad_for(cols int) int {
 }
 
 fn cmd_config(a &Args, mut scheme Scheme) {
-	concatinate(a, mut scheme)
+	concatinate(a, mut scheme, false)
 	payload := scheme.to_json()
 	if !is_tty_stdout() {
 		println(payload)
@@ -150,7 +150,7 @@ fn main() {
 			cmd_config(a, mut scheme)
 		}
 		'daemon' {
-			concatinate(a, mut scheme)
+			concatinate(a, mut scheme, a.action == 'start' || a.action == 'detach')
 			run_daemon(a, mut scheme)
 		}
 		'test' {

@@ -139,7 +139,11 @@ fn pipe_concatinate(mut scheme Scheme) {
 	}
 }
 
-pub fn concatinate(a &Args, mut scheme Scheme) {
+// `needs_image` is whether this command is going to extract colours from a wallpaper. Only then
+// is a source required: `create -- regen`, `colors` without `-g`, `config` and `daemon stop`
+// all read what is already in the cache, and demanding $LULE_W from them made every one of them
+// fail on a machine that has no wallpaper directory configured at all.
+pub fn concatinate(a &Args, mut scheme Scheme, needs_image bool) {
 	temp_concatinate(mut scheme)
 	defs_concatinate(mut scheme)
 	envi_concatinate(mut scheme)
@@ -158,7 +162,7 @@ pub fn concatinate(a &Args, mut scheme Scheme) {
 		scheme.scripts = deduped
 	}
 
-	if scheme.image == '' && scheme.walldir == '' {
+	if needs_image && scheme.image == '' && scheme.walldir == '' {
 		eprintln('${red_bold('error:')} Environment variable ${yellow("'\$LULE_W'")} is empty')
 		eprintln('${red_bold('error:')} Argument option ${yellow("'--wallpath'")} is not set')
 		eprintln('${red_bold('error:')} Image argument ${yellow("'--image'")} is not given')
