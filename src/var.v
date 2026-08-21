@@ -2,6 +2,8 @@ module main
 
 import os
 
+#include <poll.h>
+
 fn defs_concatinate(mut scheme Scheme) {
 	config_dir := os.config_dir() or {
 		eprintln('${red_bold('error:')} Path for configs is impossible to get')
@@ -115,10 +117,50 @@ fn args_concatinate(a &Args, mut scheme Scheme) {
 	}
 }
 
+struct C.pollfd {
+mut:
+	fd      int
+	events  i16
+	revents i16
+}
+
+fn C.poll(fds &C.pollfd, nfds u64, timeout int) int
+
+// Whether stdin has something to give within the deadline. EOF counts as ready, so a closed or
+// redirected stdin answers at once and only a pipe with no writer waits out the clock.
+fn stdin_ready(timeout_ms int) bool {
+	mut fd := C.pollfd{
+		fd:      0
+		events:  i16(C.POLLIN)
+		revents: 0
+	}
+	return unsafe { C.poll(&fd, 1, timeout_ms) } > 0
+}
+
+// A scheme may be piped in, so a non-tty stdin has to be read — but reading it unconditionally
+// hangs for ever when stdin is a pipe nobody ever writes to, which is what a backgrounded
+// `lule create &` inside a script leaves behind.
+//
+// Asking poll() first, rather than reading on a thread with a deadline: a thread blocked in
+// read() keeps the process alive after main returns, and even an explicit exit() does not take
+// it down, so the hang moved rather than went away.
+//
+// $LULE_STDIN_MS overrides the deadline for a slow producer.
 fn pipe_concatinate(mut scheme Scheme) {
 	if is_tty_stdin() {
 		return
 	}
+	mut budget := 250
+	if v := os.getenv_opt('LULE_STDIN_MS') {
+		parsed := v.trim_space().int()
+		if parsed > 0 {
+			budget = parsed
+		}
+	}
+	if !stdin_ready(budget) {
+		return
+	}
+
 	mut input := ''
 	for {
 		line := os.get_raw_line()
@@ -127,6 +169,7 @@ fn pipe_concatinate(mut scheme Scheme) {
 		}
 		input += line
 	}
+
 	if input.trim_space() == '' {
 		return
 	}

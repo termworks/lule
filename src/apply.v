@@ -13,6 +13,14 @@ pub fn write_colors(mut scheme Scheme, old bool) {
 				scheme.theme = content
 			}
 		}
+		// Without this, an empty cache regenerated a full 256-colour ramp out of nothing: the
+		// palette padding in gen_main_six invents grey when it is handed no pigments, so the
+		// command reported success and wrote a grey scheme over the caller's colours.
+		if scheme.pigments.len == 0 {
+			eprintln('${red_bold('error:')} nothing cached to regenerate from')
+			eprintln('${red_bold('error:')} run ${yellow('lule create -- set')} first')
+			exit(1)
+		}
 	} else {
 		if scheme.image == '' {
 			scheme.image = random_image(scheme.walldir)

@@ -131,7 +131,7 @@ pub fn print_help(logo string) {
 	println('                -- <set|regen>')
 	println('    daemon    Run as daemon process with looping wallpapers')
 	println('                --loop=<SECONDS>      loop time (default 300)')
-	println('                -- <start|stop|next|detach>')
+	println('                -- <start|stop|next|detach|status>')
 	println('    colors    Display current colors in terminal')
 	println('                -g                    generate new colors, just show them')
 	println('                -- <image|ansii|list|mix>')
