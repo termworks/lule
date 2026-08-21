@@ -187,12 +187,29 @@ fn apply_filter(input TplValue, name string, args []string) !TplValue {
 			}
 			return TplValue(readable)
 		}
-		// String transforms, applied to whatever the value displays as.
-		'upper' {
+		// String transforms, applied to whatever the value displays as. matugen spells the first
+		// two `upper_case` and `lower_case`; both names work, so a template written for either
+		// tool renders here.
+		'upper', 'upper_case' {
 			return TplValue(input.display().to_upper())
 		}
-		'lower' {
+		'lower', 'lower_case' {
 			return TplValue(input.display().to_lower())
+		}
+		'snake_case' {
+			return TplValue(to_case(input.display(), 'snake'))
+		}
+		'kebab_case' {
+			return TplValue(to_case(input.display(), 'kebab'))
+		}
+		'camel_case' {
+			return TplValue(to_case(input.display(), 'camel'))
+		}
+		'pascal_case' {
+			return TplValue(to_case(input.display(), 'pascal'))
+		}
+		'capitalize' {
+			return TplValue(capitalise(input.display()))
 		}
 		'trim' {
 			return TplValue(input.display().trim_space())
@@ -211,6 +228,73 @@ fn apply_filter(input TplValue, name string, args []string) !TplValue {
 		}
 		else {
 			return error('unknown filter `${name}`')
+		}
+	}
+}
+
+// Breaks a name into its words, whatever convention it arrived in, so the case filters can be
+// applied to input that is already snake_case, kebab-case, camelCase or prose.
+//
+// Digits stay attached to the word before them: `color0` is one word, not `color` and `0`, which
+// is the difference between `color0` and `color_0` coming out of snake_case.
+fn split_words(input string) []string {
+	mut words := []string{}
+	mut current := strings.new_builder(16)
+	bytes := input.bytes()
+
+	for i, ch in bytes {
+		if !ch.is_alnum() {
+			// Any run of punctuation or space is a boundary.
+			if current.len > 0 {
+				words << current.str().to_lower()
+				current = strings.new_builder(16)
+			}
+			continue
+		}
+		if ch.is_capital() && current.len > 0 {
+			previous := bytes[i - 1]
+			next_is_lower := i + 1 < bytes.len && bytes[i + 1].is_letter()
+				&& !bytes[i + 1].is_capital()
+			// `fooBar` breaks before the B. `HTTPServer` breaks before the S, not inside HTTP —
+			// which is why the next character matters and not just this one.
+			if !previous.is_capital() || next_is_lower {
+				words << current.str().to_lower()
+				current = strings.new_builder(16)
+			}
+		}
+		current.write_u8(ch)
+	}
+	if current.len > 0 {
+		words << current.str().to_lower()
+	}
+	return words
+}
+
+fn capitalise(word string) string {
+	if word == '' {
+		return word
+	}
+	return word[..1].to_upper() + word[1..]
+}
+
+fn to_case(input string, style string) string {
+	words := split_words(input)
+	if words.len == 0 {
+		return ''
+	}
+	return match style {
+		'snake' {
+			words.join('_')
+		}
+		'kebab' {
+			words.join('-')
+		}
+		'pascal' {
+			words.map(capitalise(it)).join('')
+		}
+		else {
+			// camel: the first word stays lowercase, the rest are capitalised.
+			words[0] + words[1..].map(capitalise(it)).join('')
 		}
 	}
 }

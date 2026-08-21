@@ -168,9 +168,15 @@ Values stay colours between stages, so filters chain:
 | set | `set_hue` `set_saturation` `set_lightness` `set_alpha` |
 | combine | `mix: "#ff0000", 0.5` |
 | readable | `contrast` — black or white, whichever reads against the input |
-| text | `upper` `lower` `trim` `replace: "a", "b"` `default: "fallback"` |
+| text | `upper` `lower` `trim` `capitalize` `replace: "a", "b"` `default: "fallback"` |
+| case | `snake_case` `kebab_case` `camel_case` `pascal_case` |
 
 A literal works as the input too: `{{ "#3f51b5" | lighten: 0.1 }}`.
+
+The case filters take the input apart whatever convention it arrived in, so `HTTPServer`,
+`http-server` and `http server` all snake_case to `http_server`. Digits stay with their word, so
+`color0` does not become `color_0`. matugen's `upper_case` and `lower_case` are accepted as
+aliases for `upper` and `lower`.
 
 ### Conditionals and loops
 

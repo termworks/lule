@@ -244,3 +244,61 @@ fn test_a_value_containing_braces_is_not_re_expanded() {
 	out, _ := render('{{ tricky }}', c)
 	assert out == '{{ theme }}'
 }
+
+fn test_case_filters_from_prose() {
+	assert render_ok('{{ "hello world" | snake_case }}') == 'hello_world'
+	assert render_ok('{{ "hello world" | kebab_case }}') == 'hello-world'
+	assert render_ok('{{ "hello world" | camel_case }}') == 'helloWorld'
+	assert render_ok('{{ "hello world" | pascal_case }}') == 'HelloWorld'
+}
+
+fn test_case_filters_recognise_the_input_convention() {
+	// The input may already be in any of these; each has to be taken apart before being put
+	// back together, or `snake_case` on camelCase input would just lowercase it.
+	for source in ['helloWorld', 'HelloWorld', 'hello_world', 'hello-world', 'hello world',
+		'HELLO_WORLD'] {
+		assert render_ok('{{ "${source}" | snake_case }}') == 'hello_world', 'from ${source}'
+		assert render_ok('{{ "${source}" | camel_case }}') == 'helloWorld', 'from ${source}'
+		assert render_ok('{{ "${source}" | pascal_case }}') == 'HelloWorld', 'from ${source}'
+		assert render_ok('{{ "${source}" | kebab_case }}') == 'hello-world', 'from ${source}'
+	}
+}
+
+fn test_case_filters_handle_acronyms() {
+	// A run of capitals is one word until the last capital, which starts the next: HTTPServer is
+	// http + server, not h + t + t + p + server.
+	assert render_ok('{{ "HTTPServer" | snake_case }}') == 'http_server'
+	assert render_ok('{{ "XMLHttpRequest" | snake_case }}') == 'xml_http_request'
+	assert render_ok('{{ "HTTP" | snake_case }}') == 'http'
+	assert render_ok('{{ "XMLHttpRequest" | pascal_case }}') == 'XmlHttpRequest'
+}
+
+fn test_case_filters_keep_digits_with_their_word() {
+	// `color0` is one word. Splitting on the digit gives `color_0`, which is not what any config
+	// key looks like.
+	assert render_ok('{{ "color0" | snake_case }}') == 'color0'
+	assert render_ok('{{ "color15" | kebab_case }}') == 'color15'
+	assert render_ok('{{ "baseColor16" | snake_case }}') == 'base_color16'
+}
+
+fn test_case_filters_on_awkward_input() {
+	assert render_ok('{{ "" | snake_case }}') == ''
+	assert render_ok('{{ "   " | snake_case }}') == ''
+	assert render_ok('{{ "---" | kebab_case }}') == ''
+	assert render_ok('{{ "  padded  " | snake_case }}') == 'padded'
+	assert render_ok('{{ "a" | pascal_case }}') == 'A'
+	assert render_ok('{{ "multiple___separators" | kebab_case }}') == 'multiple-separators'
+	assert render_ok('{{ "dots.and/slashes" | snake_case }}') == 'dots_and_slashes'
+}
+
+fn test_case_filters_chain_with_the_rest() {
+	assert render_ok('{{ theme | pascal_case }}') == 'Dark'
+	assert render_ok('{{ "some value" | snake_case | upper }}') == 'SOME_VALUE'
+	assert render_ok('{{ "TheTheme" | kebab_case | replace: "-", "+" }}') == 'the+theme'
+}
+
+fn test_matugen_case_aliases() {
+	assert render_ok('{{ theme | upper_case }}') == 'DARK'
+	assert render_ok('{{ "LOUD" | lower_case }}') == 'loud'
+	assert render_ok('{{ theme | capitalize }}') == 'Dark'
+}
