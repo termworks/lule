@@ -72,9 +72,16 @@ make.recipe{
   name = "check-static",
   desc = "fail if the release ELF asks for a loader",
   run = function()
+    -- That there *is* an ELF, before asking anything about it. An interrupted build leaves a
+    -- zero-byte target/lule, and readelf on an empty file prints nothing — so "no INTERP, no
+    -- NEEDED" came back true and the recipe reported a successful static build of nothing.
+    local info = oslo.fs.stat(BIN)
+    assert(info and info.size > 0, BIN .. " is missing or empty; the build did not finish")
+
     -- "Static" is a claim about the ELF, so check the ELF. `ldd` is not enough: it prints
     -- "statically linked" for a binary that still has an INTERP and will not start.
     local segments = oslo.run{ "readelf", "-l", BIN, capture = true }
+    assert(segments.ok, "readelf could not read " .. BIN)
     assert(not (segments.out or ""):find("program interpreter"),
            BIN .. " requests a dynamic loader; it is not static")
     local dynamic = oslo.run{ "readelf", "-d", BIN, capture = true }
