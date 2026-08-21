@@ -71,33 +71,44 @@ They use `ansi`, which is the sixteen terminal colours - `colors` is all 256:
 
 ## Configuration
 
-Everything below can live in `~/.config/lule/config.toml` (or `$LULE_C/config.toml`) instead of
-being repeated on every command line. `resources/config.example.toml` is a commented starting
-point.
+Put `config.lua` in `~/.config/lule/` (or `$LULE_C/`). It requires the `lule` module and hands
+`setup` a table, the same shape the sibling tools use.
+`resources/config.example.lua` is a commented starting point.
 
-```toml
-[settings]
-wallpaper = "~/.wallpaper"
-theme = "dark"
-contrast = "aa"
+```lua
+local lule = require("lule")
 
-[templates.kitty]
-input  = "~/.config/lule/templates/kitty.conf"
-output = "~/.config/kitty/colors.conf"
+-- One list drives every path. This is the reason to write the config in Lua rather than toml:
+-- adding an application is a word, not six lines.
+local apps = { "kitty", "waybar", "rofi" }
+local templates = {}
+for _, app in ipairs(apps) do
+  templates[#templates + 1] = lule.template(app, {
+    input  = "~/.config/lule/templates/colors.ini",
+    output = "~/.config/" .. app .. "/colors.ini",
+  })
+end
 
-[templates.waybar]
-input  = "~/.config/lule/templates/waybar.css"
-output = "~/.config/waybar/colors.css"
-
-[scripts]
-after = ["~/.local/bin/reload-colors"]
+return lule.setup({
+  settings  = { theme = "dark", contrast = "aa", palette = "pigment" },
+  templates = templates,
+  scripts   = { "~/.local/bin/reload-colors" },
+})
 ```
 
-Precedence runs **file, then environment, then flags** - a flag always wins. `~` is expanded by
-lule, since nothing in a toml file passes through a shell. A missing config is not an error; a
-malformed one is.
+`lule.template(name, spec)` only tags the table with a name, so a warning can say *which* template
+is wrong; a bare `{ input = …, output = … }` is just as valid. Templates are a list, so the order
+in the file is the order they render in.
 
-`--pattern` and `--script` *add to* what the file lists rather than replacing it.
+Precedence runs **file, then environment, then flags** - a flag always wins. `~` is expanded by
+lule, since nothing in a config file passes through a shell. `--pattern` and `--script` *add to*
+what the file lists rather than replacing it.
+
+A broken config stops the run rather than falling back to defaults, and Lua names the file and
+line: `config.lua:12: syntax error near '='`. Carrying on would quietly apply a scheme you did not
+ask for, over the top of the one you had.
+
+A `config.toml` is still read when there is no `config.lua`. Same keys, no loops.
 
 ## Environment
 

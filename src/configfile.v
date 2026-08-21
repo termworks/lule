@@ -21,6 +21,14 @@ pub fn config_path(config_dir string) string {
 // A malformed one *is* worth complaining about: silently ignoring a file the user wrote and is
 // watching for an effect is the worst of both.
 pub fn config_concatinate(mut scheme Scheme) {
+	// Lua first: it can express everything the toml can and more, so a directory holding both is
+	// answered by the one that can say more. The toml loader stays for anyone who wants something
+	// purely declarative.
+	if os.is_file(config_lua_path(scheme.config)) {
+		config_lua_concatinate(mut scheme)
+		return
+	}
+
 	path := config_path(scheme.config)
 	if !os.is_file(path) {
 		return
