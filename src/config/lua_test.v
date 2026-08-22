@@ -7,7 +7,7 @@ fn lua_config(name string, body string) string {
 	dir := os.join_path(os.temp_dir(), 'lule_lua_${name}_${os.getpid()}')
 	os.rmdir_all(dir) or {}
 	os.mkdir_all(dir) or { panic(err) }
-	os.write_file(config_lua_path(dir), body) or { panic(err) }
+	os.write_file(config_path(dir), body) or { panic(err) }
 	return dir
 }
 
@@ -17,23 +17,6 @@ fn read_lua_config(dir string) Scheme {
 	}
 	load_lua(mut scheme)
 	return scheme
-}
-
-fn test_the_older_name_is_still_read_and_init_lua_wins() {
-	dir := os.join_path(os.temp_dir(), 'lule_lua_names_${os.getpid()}')
-	os.rmdir_all(dir) or {}
-	os.mkdir_all(dir) or { panic(err) }
-
-	os.write_file(os.join_path(dir, 'config.lua'), 'return { settings = { theme = "light" } }') or {
-		panic(err)
-	}
-	assert read_lua_config(dir).theme == 'light'
-
-	os.write_file(os.join_path(dir, 'init.lua'), 'return { settings = { theme = "dark" } }') or {
-		panic(err)
-	}
-	assert read_lua_config(dir).theme == 'dark'
-	os.rmdir_all(dir) or {}
 }
 
 fn test_a_missing_config_is_not_an_error() {
@@ -170,7 +153,7 @@ return lule.setup({
 }
 
 fn test_a_config_may_compute_rather_than_declare() {
-	// The whole reason for choosing Lua over toml: one list drives every path.
+	// The whole reason the config is Lua: one list drives every path.
 	dir := lua_config('computed', 'local lule = require("lule")
 local apps = { "kitty", "waybar", "rofi" }
 local templates = {}
@@ -203,18 +186,4 @@ return lule.setup({ templates = { lule.template("a", { input = "/in/a", output =
 	load_lua(mut scheme)
 	assert scheme.patterns.len == 2
 	assert scheme.patterns[0].from == '/already'
-}
-
-fn test_lua_is_preferred_when_both_exist() {
-	dir := lua_config('both', 'local lule = require("lule")
-return lule.setup({ settings = { theme = "light" } })')
-	defer {
-		os.rmdir_all(dir) or {}
-	}
-	os.write_file(config_path(dir), '[settings]\ntheme = "dark"\n') or { panic(err) }
-	mut scheme := Scheme{
-		config: dir
-	}
-	load(mut scheme)
-	assert scheme.theme == 'light', 'the toml won'
 }

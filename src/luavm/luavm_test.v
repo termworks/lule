@@ -112,7 +112,7 @@ fn test_a_runtime_error_is_reported() {
 }
 
 fn test_the_standard_library_is_available() {
-	// A config that computes is the whole reason for choosing Lua over toml.
+	// A config that computes is the whole reason the config is Lua.
 	mut s := eval('local out = {} for i = 1, 3 do out[#out+1] = "n" .. i end
 return { joined = table.concat(out, ",") }')
 	defer { s.close() }

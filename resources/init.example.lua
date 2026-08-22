@@ -18,8 +18,8 @@ return lule.setup({
     -- blend = 0.0, seed = 0, norandom = false, loop = 300,
   },
 
-  -- Anything with a template file. One list drives every path, which is the reason to write this
-  -- in Lua rather than toml: adding an application is a word, not six lines.
+  -- Anything with a template file. One list drives every path, which is what a config
+  -- written in Lua buys you: adding an application is a word, not six lines.
   templates = (function()
     local out = {}
     for _, app in ipairs({ "kitty", "waybar", "rofi" }) do

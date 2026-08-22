@@ -12,7 +12,7 @@ fn hook_dir(name string) string {
 
 // Runs a config's `after` hook against a scheme with real colours in it.
 fn run_hook(dir string, body string) Scheme {
-	os.write_file(config_lua_path(dir), body) or { panic(err) }
+	os.write_file(config_path(dir), body) or { panic(err) }
 	mut scheme := Scheme{
 		config: dir
 		image:  '/w/pic.png'

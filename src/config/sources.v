@@ -47,7 +47,7 @@ fn cached(mut scheme Scheme) {
 	// `--scheme=gruvbox` poisoned the temp scheme, and every later `lule create` — with no
 	// --scheme at all — failed looking for it, until /tmp/lule_scheme was deleted by hand.
 	//
-	// Templates are cleared for the same reason: they are re-supplied by config.toml and by
+	// Templates are cleared for the same reason: they are re-supplied by the config file and by
 	// --pattern on every run, so keeping the previous run's set only lets stale paths pile up
 	// and get rewritten for ever.
 	scheme.image = ''
@@ -239,7 +239,7 @@ pub fn resolve(a &cmd.Args, mut scheme Scheme, needs_image bool) Hooks {
 	locate_config(a, mut scheme)
 	// Lowest of the three a user controls: the file is overridden by the environment, and both
 	// by a flag on the command line.
-	mut hooks := load(mut scheme)
+	mut hooks := load_lua(mut scheme)
 	environment(mut scheme)
 	arguments(a, mut scheme)
 	piped(mut scheme)

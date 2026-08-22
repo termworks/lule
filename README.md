@@ -53,10 +53,11 @@ colors.sh  colors.css  colors.scss  colors.ini  colors.toml  colors.json  colors
 
 Point a template at wherever the program expects it:
 
-```toml
-[templates.gtk]
-input  = "~/.config/lule/templates/colors.css"
-output = "~/.config/gtk-4.0/colors.css"
+```lua
+lule.template("gtk", {
+  input  = "~/.config/lule/templates/colors.css",
+  output = "~/.config/gtk-4.0/colors.css",
+})
 ```
 
 They use `ansi`, which is the sixteen terminal colours - `colors` is all 256:
@@ -75,7 +76,7 @@ Put `init.lua` in `~/.config/lule/` (or `$LULE_C/`). It requires the `lule` modu
 ```lua
 local lule = require("lule")
 
--- One list drives every path. This is the reason to write the config in Lua rather than toml:
+-- One list drives every path, which is what a config written in Lua buys you:
 -- adding an application is a word, not six lines.
 local apps = { "kitty", "waybar", "rofi" }
 local templates = {}
@@ -103,9 +104,6 @@ lists rather than replacing it.
 A broken config stops the run rather than falling back to defaults, and Lua names the file and
 line: `init.lua:12: syntax error near '='`. Carrying on would quietly apply a scheme you did not
 ask for, over the top of the one you had.
-
-A `config.lua` is read under the older name, and a `config.toml` when there is no Lua config at
-all. Same keys, no loops.
 
 ### Doing things once the colours exist
 

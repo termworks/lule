@@ -15,21 +15,11 @@ import luavm
 //     after     = function(c) lule.ttys(sequences_for(c)) end,
 //   })
 //
-// Preferred over config.toml when both exist. The toml loader stays for anyone who wants
-// something purely declarative.
-// `init.lua` first, which is what the sibling tools are configured by, then `config.lua` for
-// anyone who wrote one under the older name.
-pub const config_lua_names = ['init.lua', 'config.lua']
+// One config, one name. It lives in $LULE_C or ~/.config/lule.
+pub const config_name = 'init.lua'
 
-// The config that exists, or where the preferred one would go when neither does.
-pub fn config_lua_path(config_dir string) string {
-	for name in config_lua_names {
-		path := os.join_path(config_dir, name)
-		if os.is_file(path) {
-			return path
-		}
-	}
-	return os.join_path(config_dir, config_lua_names[0])
+pub fn config_path(config_dir string) string {
+	return os.join_path(config_dir, config_name)
 }
 
 // The `lule` module a config requires, written in Lua rather than registered from V.
@@ -95,7 +85,7 @@ pub fn (mut h Hooks) after(scheme &Scheme) {
 
 // Runs the config and folds what it returns into the scheme.
 pub fn load_lua(mut scheme Scheme) Hooks {
-	path := config_lua_path(scheme.config)
+	path := config_path(scheme.config)
 	if !os.is_file(path) {
 		return Hooks{}
 	}
