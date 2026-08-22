@@ -9,20 +9,26 @@ import os
 import cmd
 
 fn cmd_create(a &cmd.Args, mut scheme config.Scheme) {
-	config.resolve(a, mut scheme, a.action != 'regen')
+	mut hooks := config.resolve(a, mut scheme, a.action != 'regen')
+	defer {
+		hooks.close()
+	}
 	match a.action {
-		'set' { write_colors(mut scheme, false) }
-		'regen' { write_colors(mut scheme, true) }
-		else { write_colors(mut scheme, false) }
+		'set' { write_colors(mut scheme, false, mut hooks) }
+		'regen' { write_colors(mut scheme, true, mut hooks) }
+		else { write_colors(mut scheme, false, mut hooks) }
 	}
 }
 
 fn cmd_colors(a &cmd.Args, mut scheme config.Scheme) {
-	config.resolve(a, mut scheme, a.present['g'])
+	mut hooks := config.resolve(a, mut scheme, a.present['g'])
+	defer {
+		hooks.close()
+	}
 	scheme.scripts = []
 
 	if a.present['g'] {
-		write_colors(mut scheme, false)
+		write_colors(mut scheme, false, mut hooks)
 	}
 
 	if scheme.cache != '' {
@@ -89,7 +95,10 @@ fn pad_for(cols int) int {
 }
 
 fn cmd_config(a &cmd.Args, mut scheme config.Scheme) {
-	config.resolve(a, mut scheme, false)
+	mut hooks := config.resolve(a, mut scheme, false)
+	defer {
+		hooks.close()
+	}
 	payload := scheme.to_json()
 	if !ui.is_tty_stdout() {
 		println(payload)
@@ -163,8 +172,11 @@ fn main() {
 			cmd_config(a, mut scheme)
 		}
 		'daemon' {
-			config.resolve(a, mut scheme, a.action == 'start' || a.action == 'detach')
-			run_daemon(a, mut scheme)
+			mut hooks := config.resolve(a, mut scheme, a.action == 'start' || a.action == 'detach')
+			defer {
+				hooks.close()
+			}
+			run_daemon(a, mut scheme, mut hooks)
 		}
 		'test' {
 			cmd_test(a, mut scheme)

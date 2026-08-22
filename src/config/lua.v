@@ -50,11 +50,49 @@ package.loaded['lule'] = lule
 return lule
 "
 
+// A config's `after` hook, parked until the colours exist.
+//
+// The Lua state stays open for the whole run rather than being torn down after the settings are
+// read: settings are wanted at startup and the hook is wanted much later, and re-running the
+// config to get back to it would run any side effects in its body a second time.
+pub struct Hooks {
+mut:
+	vm      luavm.State
+	config  int = -1
+	present bool
+}
+
+pub fn (mut h Hooks) close() {
+	if h.present {
+		h.vm.close()
+		h.present = false
+	}
+}
+
+// Calls the `after` hook, if the config defined one.
+pub fn (mut h Hooks) after(scheme &Scheme) {
+	if !h.present {
+		return
+	}
+	h.vm.fetch(h.config)
+	if h.vm.field('after') == 0 || !h.vm.is_function() {
+		h.vm.pop(2)
+		return
+	}
+	push_scheme(mut h.vm, scheme)
+	h.vm.call(1) or {
+		// The colours are already written by this point, so a failing hook is worth reporting
+		// without throwing away the run that produced them.
+		eprintln('${ui.red_bold('error:')} after: ${err}')
+	}
+	h.vm.pop(1)
+}
+
 // Runs the config and folds what it returns into the scheme.
-pub fn config_lua_concatinate(mut scheme Scheme) {
+pub fn load_lua(mut scheme Scheme) Hooks {
 	path := config_lua_path(scheme.config)
 	if !os.is_file(path) {
-		return
+		return Hooks{}
 	}
 	source := os.read_file(path) or {
 		eprintln('${ui.red_bold('error:')} cannot read ${ui.yellow(path)}: ${err}')
@@ -62,9 +100,6 @@ pub fn config_lua_concatinate(mut scheme Scheme) {
 	}
 
 	mut vm := luavm.new()
-	defer {
-		vm.close()
-	}
 
 	// The module is defined before the config runs, so `require("lule")` finds it already loaded
 	// and never touches the filesystem looking for a lule.lua.
@@ -72,6 +107,8 @@ pub fn config_lua_concatinate(mut scheme Scheme) {
 		eprintln('${ui.red_bold('error:')} ${err}')
 		exit(1)
 	}
+	// The module table is on top; the V-backed functions are added to it before the config runs.
+	register_api(mut vm)
 	vm.pop(1)
 
 	vm.run(source, path) or {
@@ -83,12 +120,19 @@ pub fn config_lua_concatinate(mut scheme Scheme) {
 
 	if !vm.top_is_table() {
 		eprintln('${ui.yellow('warning:')} ${path} returned nothing; did you forget `return lule.setup({...})`?')
-		return
+		return Hooks{}
 	}
 
 	read_lua_settings(mut vm, mut scheme)
 	read_lua_templates(mut vm, mut scheme, path)
 	read_lua_scripts(mut vm, mut scheme)
+
+	// Parked in the registry so the hook can be found again once the colours exist.
+	return Hooks{
+		vm:      vm
+		config:  vm.keep()
+		present: true
+	}
 }
 
 fn read_lua_settings(mut vm luavm.State, mut scheme Scheme) {

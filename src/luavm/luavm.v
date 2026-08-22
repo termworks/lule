@@ -21,6 +21,10 @@ module luavm
 
 pub struct C.lua_State {}
 
+// C types cannot be reached through a module qualifier, so a function implemented in another
+// module can only name the state through this.
+pub type Handle = &C.lua_State
+
 fn C.luaL_newstate() &C.lua_State
 fn C.luaL_openlibs(&C.lua_State)
 fn C.luaL_loadbufferx(&C.lua_State, &char, usize, &char, &char) int
@@ -43,6 +47,15 @@ fn C.lua_setfield(&C.lua_State, int, &char)
 fn C.lua_pushcclosure(&C.lua_State, voidptr, int)
 fn C.lua_setglobal(&C.lua_State, &char)
 fn C.lua_getglobal(&C.lua_State, &char) int
+fn C.lua_pushlstring(&C.lua_State, &char, usize) &char
+fn C.lua_pushnumber(&C.lua_State, f64)
+fn C.lua_pushinteger(&C.lua_State, i64)
+fn C.lua_pushboolean(&C.lua_State, int)
+fn C.lua_rawseti(&C.lua_State, int, i64) int
+fn C.luaL_ref(&C.lua_State, int) int
+
+// The registry is where a value is parked so it survives the call that produced it.
+const registry_index = -1001000
 
 // The subset of Lua's type tags this needs to tell apart.
 pub const type_nil = 0
@@ -171,4 +184,102 @@ pub fn (mut s State) len() int {
 // Pushes the i-th element, counting from one as Lua does.
 pub fn (mut s State) index(i int) int {
 	return C.lua_rawgeti(s.handle, -1, i64(i))
+}
+
+// --- calling back into Lua ---------------------------------------------------------------------
+
+// A function Lua can call, implemented in V. The signature is what Lua's C API expects: read the
+// arguments off the stack, push the results, return how many were pushed.
+pub type Fn = fn (Handle) int
+
+// Everything a config might need at the moment the colours exist. Building it in V and handing it
+// to a Lua function is what lets a config *do* something rather than only describe something.
+pub fn (mut s State) new_table() {
+	C.lua_createtable(s.handle, 0, 0)
+}
+
+pub fn (mut s State) push_text(text string) {
+	C.lua_pushlstring(s.handle, text.str, usize(text.len))
+}
+
+pub fn (mut s State) push_number(value f64) {
+	C.lua_pushnumber(s.handle, value)
+}
+
+// Pops the value on top and stores it as `table[key]`, where the table is just below it.
+pub fn (mut s State) set_field(key string) {
+	C.lua_setfield(s.handle, -2, key.str)
+}
+
+// Pops the value on top and stores it at `table[i]`, counting from one.
+pub fn (mut s State) set_index(i int) {
+	C.lua_rawseti(s.handle, -2, i64(i))
+}
+
+// Registers `name` as a global function.
+pub fn (mut s State) register_global(name string, f Fn) {
+	C.lua_pushcclosure(s.handle, voidptr(f), 0)
+	C.lua_setglobal(s.handle, name.str)
+}
+
+// Sets `table[name] = f`, where the table is on top.
+pub fn (mut s State) register_field(name string, f Fn) {
+	C.lua_pushcclosure(s.handle, voidptr(f), 0)
+	C.lua_setfield(s.handle, -2, name.str)
+}
+
+// Keeps the value on top for the rest of the run and returns a ticket to fetch it back.
+//
+// The config's returned table has to outlive the call that produced it: settings are read at
+// startup and the `after` hook is called once the colours exist, which is much later.
+pub fn (mut s State) keep() int {
+	return C.luaL_ref(s.handle, registry_index)
+}
+
+pub fn (mut s State) fetch(ticket int) {
+	C.lua_rawgeti(s.handle, registry_index, i64(ticket))
+}
+
+// Calls the function on top with the `args` values beneath... below it, and discards its results.
+pub fn (mut s State) call(args int) ! {
+	if C.lua_pcallk(s.handle, args, 0, 0, 0, unsafe { nil }) != 0 {
+		return error(s.pop_error())
+	}
+}
+
+pub fn (mut s State) is_function() bool {
+	return C.lua_type(s.handle, -1) == 6 // LUA_TFUNCTION
+}
+
+// --- what a registered function sees -----------------------------------------------------------
+
+pub fn arg_text(state Handle, index int) string {
+	raw := C.lua_tolstring(state, index, unsafe { nil })
+	return if isnil(raw) { '' } else { unsafe { cstring_to_vstring(raw) } }
+}
+
+pub fn arg_count(state Handle) int {
+	return C.lua_gettop(state)
+}
+
+pub fn return_text(state Handle, text string) int {
+	C.lua_pushlstring(state, text.str, usize(text.len))
+	return 1
+}
+
+pub fn return_bool(state Handle, value bool) int {
+	C.lua_pushboolean(state, if value { 1 } else { 0 })
+	return 1
+}
+
+pub fn return_number(state Handle, value f64) int {
+	C.lua_pushnumber(state, value)
+	return 1
+}
+
+// A count or an exit status is a whole number, and Lua 5.4 has whole numbers. Pushing it as a
+// float made `tostring(lule.ttys(seq))` answer "18.0".
+pub fn return_int(state Handle, value i64) int {
+	C.lua_pushinteger(state, value)
+	return 1
 }

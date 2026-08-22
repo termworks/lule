@@ -243,7 +243,7 @@ pub fn piped(mut scheme Scheme) {
 // is a source required: `create -- regen`, `colors` without `-g`, `config` and `daemon stop`
 // all read what is already in the cache, and demanding $LULE_W from them made every one of them
 // fail on a machine that has no wallpaper directory configured at all.
-pub fn resolve(a &cmd.Args, mut scheme Scheme, needs_image bool) {
+pub fn resolve(a &cmd.Args, mut scheme Scheme, needs_image bool) Hooks {
 	cached(mut scheme)
 	defaults(mut scheme)
 	// Where the config lives is settled before it is read, because that is the one thing the
@@ -252,7 +252,7 @@ pub fn resolve(a &cmd.Args, mut scheme Scheme, needs_image bool) {
 	locate_config(a, mut scheme)
 	// Lowest of the three a user controls: the file is overridden by the environment, and both
 	// by a flag on the command line.
-	config_concatinate(mut scheme)
+	mut hooks := load(mut scheme)
 	environment(mut scheme)
 	arguments(a, mut scheme)
 	piped(mut scheme)
@@ -282,4 +282,5 @@ pub fn resolve(a &cmd.Args, mut scheme Scheme, needs_image bool) {
 		eprintln('\n${ui.yellow('USAGE')}\n\tlule help <subcommands>...\n\nFor more information try ${ui.blue('--help')}')
 		exit(1)
 	}
+	return hooks
 }

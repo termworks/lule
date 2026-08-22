@@ -7,7 +7,7 @@ import ui
 import os
 import cmd
 
-pub fn write_colors(mut scheme config.Scheme, old bool) {
+pub fn write_colors(mut scheme config.Scheme, old bool, mut hooks config.Hooks) {
 	// Seeded here as well as in get_all_colors, because k-means++ picks its starting centres at
 	// random: without this the extracted pigments differ run to run and the seed only fixes half
 	// the pipeline.
@@ -67,4 +67,8 @@ pub fn write_colors(mut scheme config.Scheme, old bool) {
 	if scheme.scripts.len > 0 {
 		command_execution(scheme)
 	}
+
+	// Last, once the colours, the cache, the templates and the scripts are all done — so the hook
+	// sees the same finished state anything else would.
+	hooks.after(scheme)
 }

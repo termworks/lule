@@ -110,6 +110,44 @@ ask for, over the top of the one you had.
 
 A `config.toml` is still read when there is no `config.lua`. Same keys, no loops.
 
+### Doing things once the colours exist
+
+`after` runs when the colours, the cache, the templates and the scripts are all done. It is where
+a post-generation shell script would otherwise go.
+
+```lua
+after = function(c)
+  lule.mkdir("~/.cache/wal")
+  lule.write("~/.cache/wal/colors", table.concat(c.colors, "\n"))
+
+  -- escape sequences down every open terminal: recolours a running shell in place
+  local esc = string.char(27)
+  local seq = esc .. "]11;" .. c.background .. esc .. "\\"
+  for i, hex in ipairs(c.ansi) do
+    seq = seq .. esc .. "]4;" .. (i - 1) .. ";" .. hex .. esc .. "\\"
+  end
+  lule.ttys(seq)
+
+  lule.run("hyprctl hyprpaper wallpaper ',' .. c.wallpaper .. ','")
+  lule.spawn("zedtheme")
+end
+```
+
+`c` is the finished scheme: `c.colors` (all 256), `c.ansi` (the sixteen), `c.background`,
+`c.foreground`, `c.cursor`, `c.accent`, `c.wallpaper`, `c.theme`, `c.cache`. Lists count from one,
+so `c.colors[1]` is colour 0.
+
+| | |
+|---|---|
+| files | `lule.write(path, text)` `lule.append(path, text)` `lule.read(path)` `lule.copy(from, to)` `lule.mkdir(path)` |
+| commands | `lule.run(cmd)` returns its exit status; `lule.spawn(cmd)` does not wait |
+| terminals | `lule.ttys(text)` writes to every open pty, and answers how many |
+| environment | `lule.env(name)` |
+
+Paths take `~`. `lule.read` and `lule.env` answer `nil` when there is nothing there, so
+`lule.read(p) or "default"` reads the way it looks. A failing hook is reported and the run stands:
+the colours are already written by then, and throwing them away would be worse.
+
 ## Environment
 
 | variable | what |

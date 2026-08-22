@@ -11,11 +11,11 @@ fn lua_config(name string, body string) string {
 	return dir
 }
 
-fn load_lua(dir string) Scheme {
+fn read_lua_config(dir string) Scheme {
 	mut scheme := Scheme{
 		config: dir
 	}
-	config_lua_concatinate(mut scheme)
+	load_lua(mut scheme)
 	return scheme
 }
 
@@ -26,7 +26,7 @@ fn test_a_missing_config_is_not_an_error() {
 		config: absent
 		theme:  'dark'
 	}
-	config_lua_concatinate(mut scheme)
+	load_lua(mut scheme)
 	assert scheme.theme == 'dark'
 }
 
@@ -49,7 +49,7 @@ return lule.setup({
 	defer {
 		os.rmdir_all(dir) or {}
 	}
-	s := load_lua(dir)
+	s := read_lua_config(dir)
 	assert s.theme == 'light'
 	assert s.palette == 'median'
 	assert s.sort == 'hue'
@@ -71,7 +71,7 @@ fn test_contrast_words_match_the_flag() {
 	} {
 		dir := lua_config('contrast', 'local lule = require("lule")
 return lule.setup({ settings = { contrast = "${word}" } })')
-		assert load_lua(dir).contrast == expected, 'contrast = ${word}'
+		assert read_lua_config(dir).contrast == expected, 'contrast = ${word}'
 		os.rmdir_all(dir) or {}
 	}
 }
@@ -82,7 +82,7 @@ return lule.setup({ settings = { theme = "light" } })')
 	defer {
 		os.rmdir_all(dir) or {}
 	}
-	s := load_lua(dir)
+	s := read_lua_config(dir)
 	assert s.theme == 'light'
 	assert s.scheme == ''
 	assert s.palette == ''
@@ -102,7 +102,7 @@ return lule.setup({
 	defer {
 		os.rmdir_all(dir) or {}
 	}
-	s := load_lua(dir)
+	s := read_lua_config(dir)
 	assert s.patterns.len == 2
 	assert s.patterns[0].from == '/in/a'
 	assert s.patterns[1].from == '/in/b'
@@ -115,7 +115,7 @@ return lule.setup({ templates = { { input = "/in/x", output = "/out/x" } } })')
 	defer {
 		os.rmdir_all(dir) or {}
 	}
-	s := load_lua(dir)
+	s := read_lua_config(dir)
 	assert s.patterns.len == 1
 	assert s.patterns[0].to == '/out/x'
 }
@@ -131,7 +131,7 @@ return lule.setup({
 	defer {
 		os.rmdir_all(dir) or {}
 	}
-	s := load_lua(dir)
+	s := read_lua_config(dir)
 	assert s.patterns.len == 1
 	assert s.patterns[0].from == '/in/a'
 }
@@ -142,7 +142,7 @@ return lule.setup({ scripts = { "/one.sh", "/two.sh" } })')
 	defer {
 		os.rmdir_all(dir) or {}
 	}
-	assert load_lua(dir).scripts == ['/one.sh', '/two.sh']
+	assert read_lua_config(dir).scripts == ['/one.sh', '/two.sh']
 }
 
 fn test_tilde_is_expanded() {
@@ -155,7 +155,7 @@ return lule.setup({
 	defer {
 		os.rmdir_all(dir) or {}
 	}
-	s := load_lua(dir)
+	s := read_lua_config(dir)
 	home := os.home_dir()
 	assert s.walldir == os.join_path(home, 'pictures')
 	assert s.patterns[0].from == os.join_path(home, 'in')
@@ -178,7 +178,7 @@ return lule.setup({ templates = templates })')
 	defer {
 		os.rmdir_all(dir) or {}
 	}
-	s := load_lua(dir)
+	s := read_lua_config(dir)
 	assert s.patterns.len == 3
 	assert s.patterns[0].from == '/tpl/kitty'
 	assert s.patterns[2].to == '/etc/rofi/colors'
@@ -194,7 +194,7 @@ return lule.setup({ templates = { lule.template("a", { input = "/in/a", output =
 		config:   dir
 		patterns: [Pattern{'/already', '/there'}]
 	}
-	config_lua_concatinate(mut scheme)
+	load_lua(mut scheme)
 	assert scheme.patterns.len == 2
 	assert scheme.patterns[0].from == '/already'
 }
@@ -209,6 +209,6 @@ return lule.setup({ settings = { theme = "light" } })')
 	mut scheme := Scheme{
 		config: dir
 	}
-	config_concatinate(mut scheme)
+	load(mut scheme)
 	assert scheme.theme == 'light', 'the toml won'
 }

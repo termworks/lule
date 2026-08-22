@@ -11,11 +11,11 @@ fn config_in(name string, body string) string {
 	return dir
 }
 
-fn load(dir string) Scheme {
+fn read_toml_config(dir string) Scheme {
 	mut scheme := Scheme{
 		config: dir
 	}
-	config_concatinate(mut scheme)
+	load(mut scheme)
 	return scheme
 }
 
@@ -27,7 +27,7 @@ fn test_a_missing_config_is_not_an_error() {
 		config: empty
 		theme:  'dark'
 	}
-	config_concatinate(mut scheme)
+	load(mut scheme)
 	assert scheme.theme == 'dark'
 }
 
@@ -47,7 +47,7 @@ norandom = true
 	defer {
 		os.rmdir_all(dir) or {}
 	}
-	s := load(dir)
+	s := read_toml_config(dir)
 	assert s.theme == 'light'
 	assert s.palette == 'pigment'
 	assert s.sort == 'hue'
@@ -69,7 +69,7 @@ fn test_contrast_words_match_the_flag() {
 		'3.0':  3.0
 	} {
 		dir := config_in('contrast', '[settings]\ncontrast = "${word}"\n')
-		assert load(dir).contrast == expected, 'contrast = ${word}'
+		assert read_toml_config(dir).contrast == expected, 'contrast = ${word}'
 		os.rmdir_all(dir) or {}
 	}
 }
@@ -81,7 +81,7 @@ fn test_unset_keys_are_left_alone() {
 	defer {
 		os.rmdir_all(dir) or {}
 	}
-	s := load(dir)
+	s := read_toml_config(dir)
 	assert s.theme == 'light'
 	assert s.scheme == '', 'scheme picked up `${s.scheme}`'
 	assert s.palette == ''
@@ -102,7 +102,7 @@ output = "/out/waybar.css"
 	defer {
 		os.rmdir_all(dir) or {}
 	}
-	s := load(dir)
+	s := read_toml_config(dir)
 	assert s.patterns.len == 2
 	// Sorted by name, so the order does not depend on how the map happened to hash.
 	assert s.patterns[0].from == '/in/kitty.tpl'
@@ -121,7 +121,7 @@ input = "/in/b"
 	defer {
 		os.rmdir_all(dir) or {}
 	}
-	s := load(dir)
+	s := read_toml_config(dir)
 	assert s.patterns.len == 1
 	assert s.patterns[0].from == '/in/a'
 }
@@ -131,7 +131,7 @@ fn test_scripts_are_read() {
 	defer {
 		os.rmdir_all(dir) or {}
 	}
-	s := load(dir)
+	s := read_toml_config(dir)
 	assert s.scripts == ['/one.sh', '/two.sh']
 }
 
@@ -151,7 +151,7 @@ after = ["~/s.sh"]
 	defer {
 		os.rmdir_all(dir) or {}
 	}
-	s := load(dir)
+	s := read_toml_config(dir)
 	home := os.home_dir()
 	assert s.walldir == os.join_path(home, 'pictures')
 	assert s.patterns[0].from == os.join_path(home, 'in.tpl')
@@ -165,7 +165,7 @@ fn test_an_empty_config_changes_nothing() {
 	defer {
 		os.rmdir_all(dir) or {}
 	}
-	s := load(dir)
+	s := read_toml_config(dir)
 	assert s.theme == ''
 	assert s.patterns.len == 0
 	assert s.scripts.len == 0
@@ -180,7 +180,7 @@ fn test_config_adds_to_patterns_rather_than_replacing() {
 		config:   dir
 		patterns: [Pattern{'/already', '/there'}]
 	}
-	config_concatinate(mut scheme)
+	load(mut scheme)
 	assert scheme.patterns.len == 2
 	assert scheme.patterns[0].from == '/already'
 }

@@ -80,7 +80,7 @@ fn detach() ! {
 	os.chdir('/tmp') or {}
 }
 
-fn daemoned(mut scheme config.Scheme) {
+fn daemoned(mut scheme config.Scheme, mut hooks config.Hooks) {
 	// Two daemons share one fifo, so each message goes to whichever happens to be reading and the
 	// wallpaper timers fight each other. Refusing the second is the only sane outcome.
 	if other := running_daemon_other_than(os.getpid()) {
@@ -103,7 +103,7 @@ fn daemoned(mut scheme config.Scheme) {
 	spawn read_pipe(pipe_name, pipe_ch)
 	spawn time_to_sleep(scheme.looop, time_ch)
 
-	write_colors(mut scheme, false)
+	write_colors(mut scheme, false, mut hooks)
 
 	tty := ui.is_tty_stdout()
 	for {
@@ -119,7 +119,7 @@ fn daemoned(mut scheme config.Scheme) {
 						exit(0)
 					} else if trimmed == 'next' {
 						scheme.image = ''
-						write_colors(mut scheme, false)
+						write_colors(mut scheme, false, mut hooks)
 						handled = true
 					} else {
 						if sh := config.scheme_from_json(trimmed) {
@@ -127,7 +127,7 @@ fn daemoned(mut scheme config.Scheme) {
 							if tty {
 								println(scheme.theme)
 							}
-							write_colors(mut scheme, false)
+							write_colors(mut scheme, false, mut hooks)
 							handled = true
 						} else {
 							if tty {
@@ -138,7 +138,7 @@ fn daemoned(mut scheme config.Scheme) {
 				}
 				_ := <-time_ch {
 					scheme.image = ''
-					write_colors(mut scheme, false)
+					write_colors(mut scheme, false, mut hooks)
 					handled = true
 				}
 			}
@@ -180,17 +180,17 @@ fn send_to_daemon(message string) {
 	paths.write_to_file(paths.temp_path('lule_pipe'), message)
 }
 
-pub fn run_daemon(a &cmd.Args, mut scheme config.Scheme) {
+pub fn run_daemon(a &cmd.Args, mut scheme config.Scheme, mut hooks config.Hooks) {
 	match a.action {
 		'start' {
-			daemoned(mut scheme)
+			daemoned(mut scheme, mut hooks)
 		}
 		'detach' {
 			detach() or {
 				eprintln('${ui.red_bold('error:')} ${err}')
 				exit(1)
 			}
-			daemoned(mut scheme)
+			daemoned(mut scheme, mut hooks)
 		}
 		'next' {
 			send_to_daemon('next')
