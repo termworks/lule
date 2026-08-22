@@ -4,16 +4,14 @@ import ui
 import os
 import luavm
 
-// `~/.config/lule/init.lua`, in the shape the sibling tools use: require the module, hand
-// `setup` a table, return the result.
+// `~/.config/lule/init.lua`, in the shape oslo is configured in: require the module, assign the
+// settings, register the rest. Nothing is returned.
 //
 //   local lule = require("lule")
 //
-//   return lule.setup({
-//     settings  = { theme = "dark", contrast = "aa" },
-//     templates = { lule.template("kitty", { input = "…", output = "…" }) },
-//     after     = function(c) lule.ttys(sequences_for(c)) end,
-//   })
+//   lule.theme = "dark"
+//   lule.template("kitty", { input = "…", output = "…" })
+//   lule.on.colors(function(c) lule.ttys(sequences_for(c)) end)
 //
 // One config, one name. It lives in $LULE_C or ~/.config/lule.
 pub const config_name = 'init.lua'
@@ -24,31 +22,39 @@ pub fn config_path(config_dir string) string {
 
 // The `lule` module a config requires, written in Lua rather than registered from V.
 //
-// `setup` is the identity function and `template` just tags a table. Neither needs to reach back
-// into lule, so neither needs a C closure — which keeps the whole bridge to "run a script, read
-// the table it returned" and leaves no way for a config to crash the host.
+// Registering rather than returning is what lets a config be many small functions instead of one
+// big one: `lule.on.colors` can be called as often as it likes, and each handler is named at the
+// point it is written. It also means the settings are read off this table after the config has
+// run, so the file needs no `return` at all.
 const lule_module = "local lule = {}
 
-function lule.setup(config)
-  return config or {}
-end
+lule.templates = {}
+lule.handlers = { colors = {} }
+lule.on = {}
 
--- Named so the order in the file is the order they run in, and so a warning can say which one is
--- wrong by name rather than by position.
+-- Named so the order in the file is the order they render in, and so a warning can say which one
+-- is wrong by name rather than by position.
 function lule.template(name, spec)
   local t = spec or {}
   t.name = name
+  lule.templates[#lule.templates + 1] = t
   return t
+end
+
+-- Called once the colours exist, the cache is written and the templates are rendered. As many as
+-- you like; they run in the order they were registered, and one that raises does not stop the rest.
+function lule.on.colors(fn)
+  lule.handlers.colors[#lule.handlers.colors + 1] = fn
 end
 
 package.loaded['lule'] = lule
 return lule
 "
 
-// A config's `after` hook, parked until the colours exist.
+// The handlers a config registered, parked until the colours exist.
 //
 // The Lua state stays open for the whole run rather than being torn down after the settings are
-// read: settings are wanted at startup and the hook is wanted much later, and re-running the
+// read: settings are wanted at startup and the handlers much later, and re-running the
 // config to get back to it would run any side effects in its body a second time.
 pub struct Hooks {
 mut:
@@ -64,26 +70,45 @@ pub fn (mut h Hooks) close() {
 	}
 }
 
-// Calls the `after` hook, if the config defined one.
+// Calls every handler the config registered with `lule.on.colors`, in the order it registered them.
 pub fn (mut h Hooks) after(scheme &Scheme) {
 	if !h.present {
 		return
 	}
 	h.vm.fetch(h.config)
-	if h.vm.field('after') == 0 || !h.vm.is_function() {
+	if h.vm.field('handlers') == 0 || !h.vm.top_is_table() {
 		h.vm.pop(2)
 		return
 	}
-	push_scheme(mut h.vm, scheme)
-	h.vm.call(1) or {
-		// The colours are already written by this point, so a failing hook is worth reporting
-		// without throwing away the run that produced them.
-		eprintln('${ui.red_bold('error:')} after: ${err}')
+	if h.vm.field('colors') == 0 || !h.vm.top_is_table() {
+		h.vm.pop(3)
+		return
 	}
-	h.vm.pop(1)
+
+	// Built once and parked, so ten handlers are handed the same table rather than ten copies of
+	// the same 256 strings.
+	push_scheme(mut h.vm, scheme)
+	ticket := h.vm.keep()
+
+	total := h.vm.len()
+	for i := 1; i <= total; i++ {
+		h.vm.index(i)
+		if !h.vm.is_function() {
+			h.vm.pop(1)
+			continue
+		}
+		h.vm.fetch(ticket)
+		h.vm.call(1) or {
+			// The colours are already written by this point, so a failing handler is worth
+			// reporting without throwing away the run that produced them - or the handlers after it,
+			// which have nothing to do with the one that raised.
+			eprintln('${ui.red_bold('error:')} lule.on.colors #${i}: ${err}')
+		}
+	}
+	h.vm.pop(3)
 }
 
-// Runs the config and folds what it returns into the scheme.
+// Runs the config and folds what it set into the scheme.
 pub fn load_lua(mut scheme Scheme) Hooks {
 	path := config_path(scheme.config)
 	if !os.is_file(path) {
@@ -103,8 +128,10 @@ pub fn load_lua(mut scheme Scheme) Hooks {
 		exit(1)
 	}
 	// The module table is on top; the V-backed functions are added to it before the config runs.
+	// Then it is parked in the registry: it is what the config writes its settings onto, and what
+	// the handlers are found on again once the colours exist.
 	register_api(mut vm)
-	vm.pop(1)
+	lule_table := vm.keep()
 
 	vm.run(source, path) or {
 		// A broken config is worth stopping for. Carrying on with defaults would silently apply a
@@ -112,32 +139,23 @@ pub fn load_lua(mut scheme Scheme) Hooks {
 		eprintln('${ui.red_bold('error:')} ${err}')
 		exit(1)
 	}
+	vm.pop(1) // whatever the config evaluated to; an oslo-style config returns nothing
 
-	if !vm.top_is_table() {
-		eprintln('${ui.yellow('warning:')} ${path} returned nothing; did you forget `return lule.setup({...})`?')
-		return Hooks{}
-	}
-
+	vm.fetch(lule_table)
 	read_lua_settings(mut vm, mut scheme)
 	read_lua_templates(mut vm, mut scheme, path)
+	vm.pop(1)
 
-	// Parked in the registry so the hook can be found again once the colours exist.
 	return Hooks{
 		vm:      vm
-		config:  vm.keep()
+		config:  lule_table
 		present: true
 	}
 }
 
+// Read off the module table itself, which is where `lule.theme = "dark"` put them. A setting the
+// config never mentions is left at whatever the environment or a flag says.
 fn read_lua_settings(mut vm luavm.State, mut scheme Scheme) {
-	vm.field('settings')
-	defer {
-		vm.pop(1)
-	}
-	if !vm.top_is_table() {
-		return
-	}
-
 	if v := lua_text(mut vm, 'wallpaper') {
 		scheme.walldir = expand_home(v)
 	}

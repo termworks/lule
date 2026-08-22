@@ -36,9 +36,9 @@ Copy and customize the example config:
 cp resources/init.example.lua ~/.config/lule/init.lua
 ```
 
-Its `after` hook is what runs once the colours exist — writing files, sending escape sequences to
-open terminals, reloading whatever needs reloading. See the "Doing things once the colours exist"
-section of the README.
+Its `lule.on.colors` handlers are what run once the colours exist — writing files, sending escape
+sequences to open terminals, reloading whatever needs reloading. See the "Doing things once the
+colours exist" section of the README.
 
 ### 4. Install Systemd Service
 
@@ -144,7 +144,7 @@ This will:
 - Put wallpaper images in `~/.wallpaper/`
 - Or set `LULE_W` to your wallpaper directory
 
-### The `after` hook not running
+### The colour handlers not running
 
 - Check the config is where lule looks: `~/.config/lule/init.lua`, or `$LULE_C`
 - Run `lule create -- set` by hand; a broken config names its own file and line

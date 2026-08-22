@@ -69,33 +69,34 @@ They use `ansi`, which is the sixteen terminal colours - `colors` is all 256:
 
 ## Configuration
 
-Put `init.lua` in `~/.config/lule/` (or `$LULE_C/`). It requires the `lule` module and hands
-`setup` a table, the same shape the sibling tools use.
+Put `init.lua` in `~/.config/lule/` (or `$LULE_C/`). Settings are assigned, everything else is
+registered, and nothing is returned — the same shape oslo is configured in.
 `resources/init.example.lua` is a commented starting point.
 
 ```lua
 local lule = require("lule")
 
+lule.theme    = "dark"
+lule.palette  = "pigment"
+lule.contrast = "aa"
+
 -- One list drives every path, which is what a config written in Lua buys you:
 -- adding an application is a word, not six lines.
-local apps = { "kitty", "waybar", "rofi" }
-local templates = {}
-for _, app in ipairs(apps) do
-  templates[#templates + 1] = lule.template(app, {
+for _, app in ipairs({ "kitty", "waybar", "rofi" }) do
+  lule.template(app, {
     input  = "~/.config/lule/templates/colors.ini",
     output = "~/.config/" .. app .. "/colors.ini",
   })
 end
-
-return lule.setup({
-  settings  = { theme = "dark", contrast = "aa", palette = "pigment" },
-  templates = templates,
-})
 ```
 
-`lule.template(name, spec)` only tags the table with a name, so a warning can say *which* template
-is wrong; a bare `{ input = …, output = … }` is just as valid. Templates are a list, so the order
-in the file is the order they render in.
+Settings are `wallpaper`, `theme`, `palette`, `contrast`, `scheme`, `sort`, `saturation`,
+`illumination`, `hue`, `blend`, `seed`, `loop`, `norandom` and `cache` — the flags, by the same
+names. One the config never mentions is left alone.
+
+`lule.template(name, spec)` registers a template; the name is only so a warning can say *which*
+one is wrong. The order they are called in is the order they render in, and `lule.templates` is
+the list being appended to, so it can be assigned outright instead.
 
 Precedence runs **file, then environment, then flags** - a flag always wins. `~` is expanded by
 lule, since nothing in a config file passes through a shell. `--pattern` *adds to* what the file
@@ -107,26 +108,38 @@ ask for, over the top of the one you had.
 
 ### Doing things once the colours exist
 
-`after` runs once the colours, the cache and the templates are all done. It is where a
-post-generation shell script would otherwise go.
+`lule.on.colors(fn)` registers a handler, called once the colours, the cache and the templates are
+all done. It is where a post-generation shell script would otherwise go — and it can be called as
+often as you like, so that script becomes several small functions rather than one big one.
 
 ```lua
-after = function(c)
+local function write_cache(c)
   lule.mkdir("~/.cache/wal")
   lule.write("~/.cache/wal/colors", table.concat(c.colors, "\n"))
+end
 
-  -- escape sequences down every open terminal: recolours a running shell in place
+-- escape sequences down every open terminal: recolours a running shell in place
+local function recolour_terminals(c)
   local esc = string.char(27)
   local seq = esc .. "]11;" .. c.background .. esc .. "\\"
   for i, hex in ipairs(c.ansi) do
     seq = seq .. esc .. "]4;" .. (i - 1) .. ";" .. hex .. esc .. "\\"
   end
   lule.ttys(seq)
+end
 
-  lule.run("hyprctl hyprpaper wallpaper ',' .. c.wallpaper .. ','")
+local function reload_desktop(c)
+  lule.run('hyprctl hyprpaper wallpaper ",' .. c.wallpaper .. ',"')
   lule.spawn("zedtheme")
 end
+
+lule.on.colors(write_cache)
+lule.on.colors(recolour_terminals)
+lule.on.colors(reload_desktop)
 ```
+
+Handlers run in the order they were registered, and one that raises is reported without stopping
+the ones after it.
 
 `c` is the finished scheme: `c.colors` (all 256), `c.ansi` (the sixteen), `c.background`,
 `c.foreground`, `c.cursor`, `c.accent`, `c.wallpaper`, `c.theme`, `c.cache`. Lists count from one,

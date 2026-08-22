@@ -10,7 +10,7 @@ fn hook_dir(name string) string {
 	return dir
 }
 
-// Runs a config's `after` hook against a scheme with real colours in it.
+// Runs a config's colour handlers against a scheme with real colours in it.
 fn run_hook(dir string, body string) Scheme {
 	os.write_file(config_path(dir), body) or { panic(err) }
 	mut scheme := Scheme{
@@ -36,12 +36,12 @@ fn test_the_hook_sees_the_finished_scheme() {
 		os.rmdir_all(dir) or {}
 	}
 	run_hook(dir, 'local lule = require("lule")
-return lule.setup({ after = function(c)
+lule.on.colors(function(c)
   lule.write("${dir}/out", table.concat({
     c.wallpaper, c.theme, c.cache, c.background, c.foreground, c.cursor,
     tostring(#c.colors), tostring(#c.ansi), c.colors[1], c.ansi[16],
   }, "|"))
-end })')
+end)')
 	parts := os.read_file(os.join_path(dir, 'out')) or { panic(err) }.split('|')
 	assert parts[0] == '/w/pic.png'
 	assert parts[1] == 'dark'
@@ -61,7 +61,7 @@ fn test_a_config_with_no_hook_is_fine() {
 		os.rmdir_all(dir) or {}
 	}
 	run_hook(dir, 'local lule = require("lule")
-return lule.setup({ settings = { theme = "light" } })')
+lule.theme = "light"')
 	// Reaching here without a crash is the assertion.
 	assert true
 }
@@ -72,11 +72,11 @@ fn test_write_and_read_round_trip() {
 		os.rmdir_all(dir) or {}
 	}
 	run_hook(dir, 'local lule = require("lule")
-return lule.setup({ after = function(c)
+lule.on.colors(function(c)
   lule.write("${dir}/a", "first")
   lule.append("${dir}/a", " second")
   lule.write("${dir}/echo", lule.read("${dir}/a") or "missing")
-end })')
+end)')
 	assert os.read_file(os.join_path(dir, 'echo')) or { '' } == 'first second'
 }
 
@@ -87,9 +87,9 @@ fn test_reading_a_missing_file_is_nil_not_empty() {
 		os.rmdir_all(dir) or {}
 	}
 	run_hook(dir, 'local lule = require("lule")
-return lule.setup({ after = function(c)
+lule.on.colors(function(c)
   lule.write("${dir}/out", lule.read("${dir}/nope") or "fallback")
-end })')
+end)')
 	assert os.read_file(os.join_path(dir, 'out')) or { '' } == 'fallback'
 }
 
@@ -99,9 +99,9 @@ fn test_write_creates_the_directory() {
 		os.rmdir_all(dir) or {}
 	}
 	run_hook(dir, 'local lule = require("lule")
-return lule.setup({ after = function(c)
+lule.on.colors(function(c)
   lule.write("${dir}/deep/deeper/file", "here")
-end })')
+end)')
 	assert os.exists(os.join_path(dir, 'deep/deeper/file'))
 }
 
@@ -112,10 +112,10 @@ fn test_copy_and_mkdir() {
 	}
 	os.write_file(os.join_path(dir, 'source'), 'payload') or { panic(err) }
 	run_hook(dir, 'local lule = require("lule")
-return lule.setup({ after = function(c)
+lule.on.colors(function(c)
   lule.mkdir("${dir}/made")
   lule.copy("${dir}/source", "${dir}/made/copied")
-end })')
+end)')
 	assert os.is_dir(os.join_path(dir, 'made'))
 	assert os.read_file(os.join_path(dir, 'made/copied')) or { '' } == 'payload'
 }
@@ -126,11 +126,11 @@ fn test_run_answers_the_exit_status() {
 		os.rmdir_all(dir) or {}
 	}
 	run_hook(dir, 'local lule = require("lule")
-return lule.setup({ after = function(c)
+lule.on.colors(function(c)
   local ok = lule.run("true")
   local bad = lule.run("exit 3")
   lule.write("${dir}/codes", tostring(ok) .. "," .. tostring(bad))
-end })')
+end)')
 	// Whole numbers, not floats: "0,3" rather than "0.0,3.0".
 	assert os.read_file(os.join_path(dir, 'codes')) or { '' } == '0,3'
 }
@@ -141,9 +141,9 @@ fn test_a_path_may_use_a_tilde() {
 		os.rmdir_all(dir) or {}
 	}
 	run_hook(dir, 'local lule = require("lule")
-return lule.setup({ after = function(c)
+lule.on.colors(function(c)
   lule.write("${dir}/home", tostring(lule.read("~/.lule_probe_absent") == nil))
-end })')
+end)')
 	// Only that the tilde was expanded rather than taken literally; the file does not exist.
 	assert os.read_file(os.join_path(dir, 'home')) or { '' } == 'true'
 	assert !os.exists('~')
@@ -156,9 +156,9 @@ fn test_env_reads_the_environment() {
 	}
 	os.setenv('LULE_HOOK_PROBE', 'present', true)
 	run_hook(dir, 'local lule = require("lule")
-return lule.setup({ after = function(c)
+lule.on.colors(function(c)
   lule.write("${dir}/out", (lule.env("LULE_HOOK_PROBE") or "?") .. "/" .. (lule.env("LULE_NOT_SET_AT_ALL") or "unset"))
-end })')
+end)')
 	assert os.read_file(os.join_path(dir, 'out')) or { '' } == 'present/unset'
 }
 
@@ -170,8 +170,38 @@ fn test_a_failing_hook_is_reported_not_fatal() {
 		os.rmdir_all(dir) or {}
 	}
 	run_hook(dir, 'local lule = require("lule")
-return lule.setup({ after = function(c) error("deliberate") end })')
+lule.on.colors(function(c) error("deliberate") end)')
 	assert true
+}
+
+fn test_every_registered_handler_runs_in_order() {
+	// The reason for registering rather than returning: a config is many small functions, each
+	// named where it is written, instead of one big one.
+	dir := hook_dir('many')
+	defer {
+		os.rmdir_all(dir) or {}
+	}
+	run_hook(dir, 'local lule = require("lule")
+local function first(c) lule.append("${dir}/order", "1") end
+local function second(c) lule.append("${dir}/order", "2") end
+local function third(c) lule.append("${dir}/order", "3") end
+lule.on.colors(first)
+lule.on.colors(second)
+lule.on.colors(third)')
+	assert os.read_file(os.join_path(dir, 'order')) or { '' } == '123'
+}
+
+fn test_one_failing_handler_does_not_stop_the_others() {
+	dir := hook_dir('boomrest')
+	defer {
+		os.rmdir_all(dir) or {}
+	}
+	run_hook(dir, 'local lule = require("lule")
+lule.on.colors(function(c) lule.append("${dir}/order", "1") end)
+lule.on.colors(function(c) error("deliberate") end)
+lule.on.colors(function(c) lule.append("${dir}/order", "3") end)')
+	// The one after the mistake has nothing to do with it and still runs.
+	assert os.read_file(os.join_path(dir, 'order')) or { '' } == '13'
 }
 
 fn test_the_hook_can_use_the_settings_it_declared() {
@@ -181,10 +211,8 @@ fn test_the_hook_can_use_the_settings_it_declared() {
 	}
 	scheme := run_hook(dir, 'local lule = require("lule")
 local target = "${dir}/from_settings"
-return lule.setup({
-  settings = { theme = "light" },
-  after = function(c) lule.write(target, c.theme) end,
-})')
+lule.theme = "light"
+lule.on.colors(function(c) lule.write(target, c.theme) end)')
 	assert scheme.theme == 'light'
 	// The hook is a closure over the config body, so `target` - a local declared up there - is in
 	// scope. And it sees the *settled* theme, the one the settings asked for, not the one the
