@@ -13,20 +13,27 @@ pub fn generate_template(original string, replaced string, scheme &config.Scheme
 	for problem in problems {
 		eprintln('${ui.yellow('warning:')} ${original}: ${problem}')
 	}
+	// The directory too: a template pointed at an application that has never been configured names
+	// an output whose parent does not exist yet.
+	os.mkdir_all(os.dir(replaced)) or {}
 	paths.write_to_file(replaced, rendered)
 }
 
+// Only the input has to exist. Requiring the output to exist as well meant a template could never
+// render the first time - the file it was supposed to create had to be created by hand before lule
+// would create it - and the run reported that as `is not a valid file` without saying which of the
+// two it meant.
 pub fn pattern_generation(scheme &config.Scheme) {
 	for p in scheme.patterns {
-		if os.exists(p.from) && os.exists(p.to) {
-			generate_template(p.from, p.to, scheme) or {
-				println('failed generating ${p.from} -> ${err}')
-				continue
-			}
-			println('generating :${p.from} into: ${p.to}')
-		} else {
-			println('${p.from} or ${p.to} is not a valid file')
+		if !os.exists(p.from) {
+			eprintln('${ui.yellow('warning:')} template ${ui.yellow(p.from)} does not exist')
+			continue
 		}
+		generate_template(p.from, p.to, scheme) or {
+			eprintln('${ui.yellow('warning:')} ${p.from}: ${err}')
+			continue
+		}
+		println('generating :${p.from} into: ${p.to}')
 	}
 }
 
