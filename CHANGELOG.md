@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.5.2] - 2026-08-22
+
+### <!-- 0 -->⛰️  Features
+
+- Oslo-style api, register instead of return
+- Read init.lua, as the sibling tools do
+- Let the lua config act once the colours exist
+- Add a lua configuration file
+- Add median, histogram and tonal palette backends
+- Ship a template per output format
+- Add a toml config file for settings, templates and scripts
+- Hold the ansi sixteen to a wcag contrast floor
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Render into an output that does not exist
+- Requirable fragments, templates keyed by name
+
+### <!-- 2 -->🚜 Refactor
+
+- Init.lua only, drop toml and config.lua
+- Drop the scripts option and $LULE_S
+- Gather every config source into a config module
+- Split terminal and file helpers into ui and paths
+- Move the template engine into its own module
+- Move palette extraction into a palette module
+- Move colour maths into a color module
+- Move argument parsing into a cmd module
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Report the binary, add the install alias
+- Cleanup
+
 ## [0.5.1] - 2026-08-21
 
 ### <!-- 0 -->⛰️  Features
