@@ -33,7 +33,7 @@ mkdir -p ~/.cache/lule
 Copy and customize the example config:
 
 ```bash
-cp resources/config.example.lua ~/.config/lule/config.lua
+cp resources/init.example.lua ~/.config/lule/init.lua
 ```
 
 Its `after` hook is what runs once the colours exist — writing files, sending escape sequences to
@@ -146,7 +146,7 @@ This will:
 
 ### The `after` hook not running
 
-- Check the config is where lule looks: `~/.config/lule/config.lua`, or `$LULE_C`
+- Check the config is where lule looks: `~/.config/lule/init.lua`, or `$LULE_C`
 - Run `lule create -- set` by hand; a broken config names its own file and line
 
 ### Colors not applying to terminals

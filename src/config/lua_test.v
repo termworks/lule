@@ -19,6 +19,23 @@ fn read_lua_config(dir string) Scheme {
 	return scheme
 }
 
+fn test_the_older_name_is_still_read_and_init_lua_wins() {
+	dir := os.join_path(os.temp_dir(), 'lule_lua_names_${os.getpid()}')
+	os.rmdir_all(dir) or {}
+	os.mkdir_all(dir) or { panic(err) }
+
+	os.write_file(os.join_path(dir, 'config.lua'), 'return { settings = { theme = "light" } }') or {
+		panic(err)
+	}
+	assert read_lua_config(dir).theme == 'light'
+
+	os.write_file(os.join_path(dir, 'init.lua'), 'return { settings = { theme = "dark" } }') or {
+		panic(err)
+	}
+	assert read_lua_config(dir).theme == 'dark'
+	os.rmdir_all(dir) or {}
+}
+
 fn test_a_missing_config_is_not_an_error() {
 	absent := os.join_path(os.temp_dir(), 'lule_lua_absent_${os.getpid()}')
 	os.rmdir_all(absent) or {}

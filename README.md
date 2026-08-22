@@ -68,9 +68,9 @@ They use `ansi`, which is the sixteen terminal colours - `colors` is all 256:
 
 ## Configuration
 
-Put `config.lua` in `~/.config/lule/` (or `$LULE_C/`). It requires the `lule` module and hands
+Put `init.lua` in `~/.config/lule/` (or `$LULE_C/`). It requires the `lule` module and hands
 `setup` a table, the same shape the sibling tools use.
-`resources/config.example.lua` is a commented starting point.
+`resources/init.example.lua` is a commented starting point.
 
 ```lua
 local lule = require("lule")
@@ -101,10 +101,11 @@ lule, since nothing in a config file passes through a shell. `--pattern` *adds t
 lists rather than replacing it.
 
 A broken config stops the run rather than falling back to defaults, and Lua names the file and
-line: `config.lua:12: syntax error near '='`. Carrying on would quietly apply a scheme you did not
+line: `init.lua:12: syntax error near '='`. Carrying on would quietly apply a scheme you did not
 ask for, over the top of the one you had.
 
-A `config.toml` is still read when there is no `config.lua`. Same keys, no loops.
+A `config.lua` is read under the older name, and a `config.toml` when there is no Lua config at
+all. Same keys, no loops.
 
 ### Doing things once the colours exist
 

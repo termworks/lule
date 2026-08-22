@@ -1,4 +1,4 @@
--- lule's configuration. Put this at ~/.config/lule/config.lua, or wherever $LULE_C points.
+-- lule's configuration. Put this at ~/.config/lule/init.lua, or wherever $LULE_C points.
 --
 -- Settings are defaults: the environment overrides them, and a command-line flag overrides both.
 -- The `after` hook runs once the colours, the cache and the templates are all done, and is where

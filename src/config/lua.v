@@ -4,7 +4,7 @@ import ui
 import os
 import luavm
 
-// `~/.config/lule/config.lua`, in the shape the sibling tools use: require the module, hand
+// `~/.config/lule/init.lua`, in the shape the sibling tools use: require the module, hand
 // `setup` a table, return the result.
 //
 //   local lule = require("lule")
@@ -17,10 +17,19 @@ import luavm
 //
 // Preferred over config.toml when both exist. The toml loader stays for anyone who wants
 // something purely declarative.
-pub const config_lua_name = 'config.lua'
+// `init.lua` first, which is what the sibling tools are configured by, then `config.lua` for
+// anyone who wrote one under the older name.
+pub const config_lua_names = ['init.lua', 'config.lua']
 
+// The config that exists, or where the preferred one would go when neither does.
 pub fn config_lua_path(config_dir string) string {
-	return os.join_path(config_dir, config_lua_name)
+	for name in config_lua_names {
+		path := os.join_path(config_dir, name)
+		if os.is_file(path) {
+			return path
+		}
+	}
+	return os.join_path(config_dir, config_lua_names[0])
 }
 
 // The `lule` module a config requires, written in Lua rather than registered from V.
