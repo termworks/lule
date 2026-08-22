@@ -1,5 +1,6 @@
-module main
+module config
 
+import wallpaper
 import paths
 import ui
 import os
@@ -7,7 +8,7 @@ import cmd
 
 #include <poll.h>
 
-fn defs_concatinate(mut scheme Scheme) {
+pub fn defaults(mut scheme Scheme) {
 	config_dir := os.config_dir() or {
 		eprintln('${ui.red_bold('error:')} Path for configs is impossible to get')
 		exit(1)
@@ -20,7 +21,7 @@ fn defs_concatinate(mut scheme Scheme) {
 	scheme.palette = 'pigment'
 }
 
-fn envi_concatinate(mut scheme Scheme) {
+pub fn environment(mut scheme Scheme) {
 	if v := os.getenv_opt('LULE_W') {
 		scheme.walldir = v
 	}
@@ -39,7 +40,7 @@ fn envi_concatinate(mut scheme Scheme) {
 	}
 }
 
-fn temp_concatinate(mut scheme Scheme) {
+fn cached(mut scheme Scheme) {
 	if content := paths.file_to_string(paths.temp_path('lule_scheme')) {
 		if sh := scheme_from_json(content) {
 			config := scheme.config
@@ -63,7 +64,7 @@ fn temp_concatinate(mut scheme Scheme) {
 
 // The palette-tuning flags, shared by `create` and `test` so a setting can be previewed with the
 // command that draws it and then applied with the command that saves it.
-fn tuning_concatinate(a &cmd.Args, mut scheme Scheme) {
+fn tuning(a &cmd.Args, mut scheme Scheme) {
 	if v := a.flags['saturation'] {
 		scheme.saturation = v.f64()
 	}
@@ -90,7 +91,7 @@ fn tuning_concatinate(a &cmd.Args, mut scheme Scheme) {
 	}
 }
 
-fn args_concatinate(a &cmd.Args, mut scheme Scheme) {
+pub fn arguments(a &cmd.Args, mut scheme Scheme) {
 	if a.multi['script'].len > 0 {
 		mut scripts := scheme.scripts.clone()
 		scripts << a.multi['script']
@@ -123,10 +124,10 @@ fn args_concatinate(a &cmd.Args, mut scheme Scheme) {
 	match a.subcommand {
 		'create' {
 			if v := a.flags['image'] {
-				scheme.image = valid_image(v)
+				scheme.image = wallpaper.valid_image(v)
 			} else if v := a.flags['wallpath'] {
 				scheme.walldir = v
-				scheme.image = random_image(v)
+				scheme.image = wallpaper.random_image(v)
 			}
 			if v := a.flags['theme'] {
 				scheme.theme = v
@@ -145,7 +146,7 @@ fn args_concatinate(a &cmd.Args, mut scheme Scheme) {
 			if v := a.flags['scheme'] {
 				scheme.scheme = v
 			}
-			tuning_concatinate(a, mut scheme)
+			tuning(a, mut scheme)
 		}
 		'config' {
 			if v := a.flags['theme'] {
@@ -162,12 +163,12 @@ fn args_concatinate(a &cmd.Args, mut scheme Scheme) {
 		}
 		'test' {
 			if v := a.flags['image'] {
-				scheme.image = valid_image(v)
+				scheme.image = wallpaper.valid_image(v)
 			}
 			if v := a.flags['theme'] {
 				scheme.theme = v
 			}
-			tuning_concatinate(a, mut scheme)
+			tuning(a, mut scheme)
 		}
 		else {}
 	}
@@ -202,7 +203,7 @@ fn stdin_ready(timeout_ms int) bool {
 // it down, so the hang moved rather than went away.
 //
 // $LULE_STDIN_MS overrides the deadline for a slow producer.
-fn pipe_concatinate(mut scheme Scheme) {
+pub fn piped(mut scheme Scheme) {
 	if ui.is_tty_stdin() {
 		return
 	}
@@ -242,9 +243,9 @@ fn pipe_concatinate(mut scheme Scheme) {
 // is a source required: `create -- regen`, `colors` without `-g`, `config` and `daemon stop`
 // all read what is already in the cache, and demanding $LULE_W from them made every one of them
 // fail on a machine that has no wallpaper directory configured at all.
-pub fn concatinate(a &cmd.Args, mut scheme Scheme, needs_image bool) {
-	temp_concatinate(mut scheme)
-	defs_concatinate(mut scheme)
+pub fn resolve(a &cmd.Args, mut scheme Scheme, needs_image bool) {
+	cached(mut scheme)
+	defaults(mut scheme)
 	// Where the config lives is settled before it is read, because that is the one thing the
 	// file cannot tell us. $LULE_C and --configs are the only two settings resolved this early;
 	// everything else the environment and the flags say is applied afterwards, on top.
@@ -252,9 +253,9 @@ pub fn concatinate(a &cmd.Args, mut scheme Scheme, needs_image bool) {
 	// Lowest of the three a user controls: the file is overridden by the environment, and both
 	// by a flag on the command line.
 	config_concatinate(mut scheme)
-	envi_concatinate(mut scheme)
-	args_concatinate(a, mut scheme)
-	pipe_concatinate(mut scheme)
+	environment(mut scheme)
+	arguments(a, mut scheme)
+	piped(mut scheme)
 
 	// Scripts survive in the cached scheme, so clearing $LULE_S does not stop them running — the
 	// list was already persisted by an earlier run. This is the switch that actually does.

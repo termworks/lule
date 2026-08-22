@@ -1,5 +1,6 @@
-module main
+module config
 
+import color
 import os
 
 fn config_in(name string, body string) string {
@@ -61,8 +62,8 @@ norandom = true
 
 fn test_contrast_words_match_the_flag() {
 	for word, expected in {
-		'aa':   contrast_aa
-		'aaa':  contrast_aaa
+		'aa':   color.contrast_aa
+		'aaa':  color.contrast_aaa
 		'none': -1.0
 		'off':  -1.0
 		'3.0':  3.0

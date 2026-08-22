@@ -1,4 +1,4 @@
-module main
+module wallpaper
 
 import ui
 import os
@@ -51,4 +51,3 @@ pub fn random_image(dir string) string {
 	eprintln('${ui.red_bold('error:')} No decodable images in ${ui.yellow(dir)}')
 	exit(1)
 }
-

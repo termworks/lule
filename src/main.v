@@ -1,13 +1,15 @@
 module main
 
+import wallpaper
+import config
 import paths
 import ui
 import color
 import os
 import cmd
 
-fn cmd_create(a &cmd.Args, mut scheme Scheme) {
-	concatinate(a, mut scheme, a.action != 'regen')
+fn cmd_create(a &cmd.Args, mut scheme config.Scheme) {
+	config.resolve(a, mut scheme, a.action != 'regen')
 	match a.action {
 		'set' { write_colors(mut scheme, false) }
 		'regen' { write_colors(mut scheme, true) }
@@ -15,8 +17,8 @@ fn cmd_create(a &cmd.Args, mut scheme Scheme) {
 	}
 }
 
-fn cmd_colors(a &cmd.Args, mut scheme Scheme) {
-	concatinate(a, mut scheme, a.present['g'])
+fn cmd_colors(a &cmd.Args, mut scheme config.Scheme) {
+	config.resolve(a, mut scheme, a.present['g'])
 	scheme.scripts = []
 
 	if a.present['g'] {
@@ -86,8 +88,8 @@ fn pad_for(cols int) int {
 	return (cols - 56) / 16
 }
 
-fn cmd_config(a &cmd.Args, mut scheme Scheme) {
-	concatinate(a, mut scheme, false)
+fn cmd_config(a &cmd.Args, mut scheme config.Scheme) {
+	config.resolve(a, mut scheme, false)
 	payload := scheme.to_json()
 	if !ui.is_tty_stdout() {
 		println(payload)
@@ -96,18 +98,18 @@ fn cmd_config(a &cmd.Args, mut scheme Scheme) {
 	}
 }
 
-fn cmd_test(a &cmd.Args, mut scheme Scheme) {
-	defs_concatinate(mut scheme)
-	envi_concatinate(mut scheme)
-	args_concatinate(a, mut scheme)
-	pipe_concatinate(mut scheme)
+fn cmd_test(a &cmd.Args, mut scheme config.Scheme) {
+	config.defaults(mut scheme)
+	config.environment(mut scheme)
+	config.arguments(a, mut scheme)
+	config.piped(mut scheme)
 
 	if scheme.image == '' {
 		if scheme.walldir == '' {
 			eprintln('${ui.red_bold('error:')} no image or wallpath given')
 			exit(1)
 		}
-		scheme.image = random_image(scheme.walldir)
+		scheme.image = wallpaper.random_image(scheme.walldir)
 	}
 
 	palette := palette_from_image(scheme.image, scheme.palette)
@@ -132,7 +134,7 @@ fn cmd_test(a &cmd.Args, mut scheme Scheme) {
 
 fn main() {
 	argv := os.args[1..]
-	mut scheme := Scheme{}
+	mut scheme := config.Scheme{}
 
 	if argv.len == 0 {
 		cmd.print_help(cmd.read_logo())
@@ -161,7 +163,7 @@ fn main() {
 			cmd_config(a, mut scheme)
 		}
 		'daemon' {
-			concatinate(a, mut scheme, a.action == 'start' || a.action == 'detach')
+			config.resolve(a, mut scheme, a.action == 'start' || a.action == 'detach')
 			run_daemon(a, mut scheme)
 		}
 		'test' {

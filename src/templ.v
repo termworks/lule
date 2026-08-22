@@ -1,12 +1,13 @@
 module main
 
+import config
 import paths
 import ui
 import os
 import color
 import template
 
-pub fn generate_template(original string, replaced string, scheme &Scheme) ! {
+pub fn generate_template(original string, replaced string, scheme &config.Scheme) ! {
 	content := paths.file_to_string(original)!
 	rendered, problems := template.render_in(content, template_context(scheme), os.dir(original))
 	for problem in problems {
@@ -15,7 +16,7 @@ pub fn generate_template(original string, replaced string, scheme &Scheme) ! {
 	paths.write_to_file(replaced, rendered)
 }
 
-pub fn pattern_generation(scheme &Scheme) {
+pub fn pattern_generation(scheme &config.Scheme) {
 	for p in scheme.patterns {
 		if os.exists(p.from) && os.exists(p.to) {
 			generate_template(p.from, p.to, scheme) or {
@@ -30,7 +31,7 @@ pub fn pattern_generation(scheme &Scheme) {
 }
 
 // Everything a template can name.
-pub fn template_context(scheme &Scheme) map[string]template.TplValue {
+pub fn template_context(scheme &config.Scheme) map[string]template.TplValue {
 	mut ctx := map[string]template.TplValue{}
 	for i, color in scheme.colors {
 		ctx['color${i}'] = template.TplValue(color)

@@ -1,10 +1,11 @@
 module main
 
+import config
 import paths
 import os
 import json
 
-pub fn write_temp(scheme &Scheme) {
+pub fn write_temp(scheme &config.Scheme) {
 	if scheme.colors.len > 0 {
 		mut record := []string{}
 		for swatch in scheme.colors {
@@ -28,7 +29,7 @@ pub fn write_temp(scheme &Scheme) {
 // earlier run's /tmp/lule_palette — a scheme built out of another wallpaper's colours, reported
 // as success. The temp files are still written for scripts that read them; they are just no
 // longer the route the cache is filled by.
-pub fn write_cache(scheme &Scheme) {
+pub fn write_cache(scheme &config.Scheme) {
 	if scheme.cache == '' {
 		return
 	}
@@ -52,7 +53,7 @@ pub fn write_cache(scheme &Scheme) {
 	}
 }
 
-pub fn write_cache_json(scheme &Scheme, payload string) {
+pub fn write_cache_json(scheme &config.Scheme, payload string) {
 	if scheme.cache == '' {
 		return
 	}
@@ -60,7 +61,7 @@ pub fn write_cache_json(scheme &Scheme, payload string) {
 	paths.write_to_file(os.join_path(scheme.cache, 'colors.json'), payload)
 }
 
-pub fn output_to_json(scheme &Scheme, as_map bool) string {
+pub fn output_to_json(scheme &config.Scheme, as_map bool) string {
 	mut color_vec := []string{}
 	mut color_map := map[string]string{}
 	for key, color in scheme.colors {
@@ -70,20 +71,20 @@ pub fn output_to_json(scheme &Scheme, as_map bool) string {
 	if color_vec.len < 16 {
 		return '{}'
 	}
-	special := Special{
+	special := config.Special{
 		background: color_vec[0]
 		foreground: color_vec[15]
 		cursor:     color_vec[1]
 	}
 	if as_map {
-		return json.encode_pretty(ProfileMap{
+		return json.encode_pretty(config.ProfileMap{
 			wallpaper: scheme.image
 			theme:     scheme.theme
 			special:   special
 			colors:    color_map
 		})
 	}
-	return json.encode_pretty(ProfileVec{
+	return json.encode_pretty(config.ProfileVec{
 		wallpaper: scheme.image
 		theme:     scheme.theme
 		special:   special

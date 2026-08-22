@@ -1,4 +1,4 @@
-module main
+module config
 
 import os
 import cmd

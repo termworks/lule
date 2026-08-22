@@ -1,11 +1,13 @@
 module main
 
+import wallpaper
+import config
 import paths
 import ui
 import os
 import cmd
 
-pub fn write_colors(mut scheme Scheme, old bool) {
+pub fn write_colors(mut scheme config.Scheme, old bool) {
 	// Seeded here as well as in get_all_colors, because k-means++ picks its starting centres at
 	// random: without this the extracted pigments differ run to run and the seed only fixes half
 	// the pipeline.
@@ -32,14 +34,14 @@ pub fn write_colors(mut scheme Scheme, old bool) {
 		// A named scheme from the configs directory: a file of hex colours, one per line, used
 		// instead of extracting from a wallpaper. The wallpaper is still recorded so the rest of
 		// the pipeline and any templates still know what is on screen.
-		scheme.pigments = named_scheme(scheme.config, scheme.scheme)
+		scheme.pigments = config.named_scheme(scheme.config, scheme.scheme)
 		if scheme.image == '' && scheme.walldir != '' {
-			scheme.image = random_image(scheme.walldir)
+			scheme.image = wallpaper.random_image(scheme.walldir)
 		}
 		paths.write_temp_file('lule_palette', scheme.pigments.join('\n'))
 	} else {
 		if scheme.image == '' {
-			scheme.image = random_image(scheme.walldir)
+			scheme.image = wallpaper.random_image(scheme.walldir)
 		}
 		known := cmd.known_palettes()
 		if scheme.palette in known {

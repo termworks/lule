@@ -1,5 +1,6 @@
-module main
+module config
 
+import color
 import ui
 import os
 import toml
@@ -171,8 +172,8 @@ fn as_float(value toml.Any) ?f64 {
 // Shared with the `--contrast` flag so the file and the flag understand the same words.
 pub fn parse_contrast(text string) f64 {
 	return match text.to_lower() {
-		'aa' { contrast_aa }
-		'aaa' { contrast_aaa }
+		'aa' { color.contrast_aa }
+		'aaa' { color.contrast_aaa }
 		'none', 'off', '0', 'false' { -1.0 }
 		else { text.f64() }
 	}

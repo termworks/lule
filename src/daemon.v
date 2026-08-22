@@ -1,5 +1,6 @@
 module main
 
+import config
 import paths
 import ui
 import os
@@ -79,7 +80,7 @@ fn detach() ! {
 	os.chdir('/tmp') or {}
 }
 
-fn daemoned(mut scheme Scheme) {
+fn daemoned(mut scheme config.Scheme) {
 	// Two daemons share one fifo, so each message goes to whichever happens to be reading and the
 	// wallpaper timers fight each other. Refusing the second is the only sane outcome.
 	if other := running_daemon_other_than(os.getpid()) {
@@ -121,7 +122,7 @@ fn daemoned(mut scheme Scheme) {
 						write_colors(mut scheme, false)
 						handled = true
 					} else {
-						if sh := scheme_from_json(trimmed) {
+						if sh := config.scheme_from_json(trimmed) {
 							scheme.modi(sh)
 							if tty {
 								println(scheme.theme)
@@ -179,7 +180,7 @@ fn send_to_daemon(message string) {
 	paths.write_to_file(paths.temp_path('lule_pipe'), message)
 }
 
-pub fn run_daemon(a &cmd.Args, mut scheme Scheme) {
+pub fn run_daemon(a &cmd.Args, mut scheme config.Scheme) {
 	match a.action {
 		'start' {
 			daemoned(mut scheme)

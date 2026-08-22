@@ -1,12 +1,13 @@
 module main
 
+import config
 import template { TplValue }
 
-// These reach for Scheme and template_context, which live here rather than in the engine: the
+// These reach for config.Scheme and template_context, which live here rather than in the engine: the
 // engine takes a plain map so it never has to know what a colour scheme is.
 
 fn test_template_context_exposes_the_scheme() {
-	mut scheme := Scheme{
+	mut scheme := config.Scheme{
 		theme:    'light'
 		image:    '/w/a.png'
 		pigments: ['#123456', '#654321']
@@ -26,7 +27,7 @@ fn test_template_context_exposes_the_scheme() {
 fn test_ansi_exposes_only_the_sixteen() {
 	// `colors` is all 256. A template wanting the ANSI set had no way to stop at sixteen: there
 	// is no dynamic lookup by index, and a loop cannot break early.
-	mut scheme := Scheme{
+	mut scheme := config.Scheme{
 		theme:    'dark'
 		pigments: ['#3f51b5', '#e91e63', '#4caf50', '#ff9800']
 	}

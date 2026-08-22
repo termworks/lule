@@ -1,5 +1,6 @@
 module main
 
+import config
 import palette
 import color
 
@@ -63,7 +64,7 @@ fn test_full_palette_is_exactly_256() {
 	// ANSI display walks 0..256. A pipeline that returns 255 breaks all of them.
 	for theme in ['dark', 'light'] {
 		for norandom in [true, false] {
-			mut scheme := Scheme{
+			mut scheme := config.Scheme{
 				theme:    theme
 				pigments: sample_pigments()
 				norandom: norandom
@@ -75,11 +76,11 @@ fn test_full_palette_is_exactly_256() {
 }
 
 fn test_dark_and_light_differ_at_the_ends() {
-	mut dark := Scheme{
+	mut dark := config.Scheme{
 		theme:    'dark'
 		pigments: sample_pigments()
 	}
-	mut light := Scheme{
+	mut light := config.Scheme{
 		theme:    'light'
 		pigments: sample_pigments()
 	}
@@ -92,18 +93,18 @@ fn test_dark_and_light_differ_at_the_ends() {
 }
 
 fn test_scheme_json_roundtrip() {
-	original := Scheme{
+	original := config.Scheme{
 		image:    '/w/a.png'
 		theme:    'light'
 		pigments: ['#111111', '#222222']
 		walldir:  '/w'
 		scripts:  ['/s.sh']
-		patterns: [Pattern{'/in', '/out'}]
+		patterns: [config.Pattern{'/in', '/out'}]
 		looop:    42
 		palette:  'pigment'
 		norandom: true
 	}
-	back := scheme_from_json(original.to_json()) or {
+	back := config.scheme_from_json(original.to_json()) or {
 		assert false, 'scheme did not round-trip: ${err}'
 		return
 	}
@@ -119,20 +120,20 @@ fn test_scheme_json_roundtrip() {
 }
 
 fn test_scheme_rejects_rubbish() {
-	if _ := scheme_from_json('not json at all') {
+	if _ := config.scheme_from_json('not json at all') {
 		assert false, 'accepted non-json'
 	}
 }
 
 fn test_modi_only_overlays_what_is_set() {
-	mut base := Scheme{
+	mut base := config.Scheme{
 		image:   '/keep.png'
 		theme:   'dark'
 		walldir: '/w'
 		looop:   300
 	}
 	// An empty incoming field means "not specified" and must not wipe the existing value.
-	base.modi(Scheme{ theme: 'light' })
+	base.modi(config.Scheme{ theme: 'light' })
 	assert base.theme == 'light'
 	assert base.image == '/keep.png'
 	assert base.walldir == '/w'
@@ -140,11 +141,11 @@ fn test_modi_only_overlays_what_is_set() {
 }
 
 fn test_is_dark_defaults_to_dark() {
-	assert Scheme{}.is_dark()
-	assert Scheme{
+	assert config.Scheme{}.is_dark()
+	assert config.Scheme{
 		theme: 'dark'
 	}.is_dark()
-	assert !Scheme{
+	assert !config.Scheme{
 		theme: 'light'
 	}.is_dark()
 }
@@ -248,7 +249,7 @@ fn muted() []color.Color {
 fn test_saturation_is_monotonic_and_bottoms_out_at_grey() {
 	mut previous := -1.0
 	for s in [-1.0, -0.5, 0.0, 0.5, 1.0] {
-		adjusted := adjust_palette(muted(), &Scheme{
+		adjusted := adjust_palette(muted(), &config.Scheme{
 			saturation: s
 		})
 		chroma := mean_chroma(adjusted)
@@ -256,9 +257,10 @@ fn test_saturation_is_monotonic_and_bottoms_out_at_grey() {
 		previous = chroma
 	}
 	// -1.0 is fully grey, which means r == g == b for every colour.
-	for c in adjust_palette(vivid(), &Scheme{
+	grey := config.Scheme{
 		saturation: -1.0
-	}) {
+	}
+	for c in adjust_palette(vivid(), &grey) {
 		r, g, b := c.rgb_u8()
 		assert r == g && g == b, '${c.to_hex(true)} is not grey'
 	}
@@ -267,7 +269,7 @@ fn test_saturation_is_monotonic_and_bottoms_out_at_grey() {
 fn test_illumination_is_monotonic() {
 	mut previous := -1.0
 	for i in [-0.3, -0.15, 0.0, 0.15, 0.3] {
-		adjusted := adjust_palette(vivid(), &Scheme{
+		adjusted := adjust_palette(vivid(), &config.Scheme{
 			illumination: i
 		})
 		light := mean_lightness(adjusted)
@@ -279,10 +281,10 @@ fn test_illumination_is_monotonic() {
 fn test_hue_rotation_wraps_and_returns() {
 	// A full turn is the identity, and a half turn is not.
 	original := vivid()
-	full := adjust_palette(original, &Scheme{
+	full := adjust_palette(original, &config.Scheme{
 		hue: 360.0
 	})
-	half := adjust_palette(original, &Scheme{
+	half := adjust_palette(original, &config.Scheme{
 		hue: 180.0
 	})
 	for i in 0 .. original.len {
@@ -294,21 +296,22 @@ fn test_hue_rotation_wraps_and_returns() {
 fn test_blend_pulls_everything_toward_the_first() {
 	original := vivid()
 	// Fully blended, every colour but the anchor has collapsed onto it.
-	blended := adjust_palette(original, &Scheme{
+	blended := adjust_palette(original, &config.Scheme{
 		blend: 1.0
 	})
 	for c in blended {
 		assert color.delta_e_cie76(c.to_lab(), original[0].to_lab()) < 1.0
 	}
 	// Unblended leaves them where they were.
-	assert adjust_palette(original, &Scheme{
+	assert adjust_palette(original, &config.Scheme{
 		blend: 0.0
 	})[2].to_hex(true) == original[2].to_hex(true)
 }
 
 fn test_no_tuning_is_the_identity() {
 	original := vivid()
-	for i, c in adjust_palette(original, &Scheme{}) {
+	untouched := config.Scheme{}
+	for i, c in adjust_palette(original, &untouched) {
 		assert c.to_hex(true) == original[i].to_hex(true)
 	}
 }
@@ -341,15 +344,15 @@ fn test_sort_palette_orders_as_named() {
 }
 
 fn test_seed_makes_generation_reproducible() {
-	mut a := Scheme{
+	mut a := config.Scheme{
 		pigments: sample_pigments()
 		seed:     4242
 	}
-	mut b := Scheme{
+	mut b := config.Scheme{
 		pigments: sample_pigments()
 		seed:     4242
 	}
-	mut c := Scheme{
+	mut c := config.Scheme{
 		pigments: sample_pigments()
 		seed:     9999
 	}
@@ -373,10 +376,10 @@ fn test_seed_makes_generation_reproducible() {
 fn test_saturation_clamps_rather_than_overflowing() {
 	// vivid() is already fully saturated, so pushing further must leave it where it is instead
 	// of wrapping round into a different hue.
-	at_max := adjust_palette(vivid(), &Scheme{
+	at_max := adjust_palette(vivid(), &config.Scheme{
 		saturation: 0.5
 	})
-	way_past := adjust_palette(vivid(), &Scheme{
+	way_past := adjust_palette(vivid(), &config.Scheme{
 		saturation: 50.0
 	})
 	for i in 0 .. at_max.len {
@@ -385,10 +388,10 @@ fn test_saturation_clamps_rather_than_overflowing() {
 }
 
 fn test_illumination_clamps_at_both_ends() {
-	white := adjust_palette(vivid(), &Scheme{
+	white := adjust_palette(vivid(), &config.Scheme{
 		illumination: 5.0
 	})
-	black := adjust_palette(vivid(), &Scheme{
+	black := adjust_palette(vivid(), &config.Scheme{
 		illumination: -5.0
 	})
 	for c in white {
@@ -445,7 +448,7 @@ fn test_ensure_distinct_avoids_the_extremes() {
 fn test_generated_scheme_has_sixteen_usable_colours() {
 	// Monochrome pigments end to end: the scheme still has to offer sixteen colours a terminal
 	// can tell apart.
-	mut scheme := Scheme{
+	mut scheme := config.Scheme{
 		theme:    'dark'
 		pigments: ['#c8c8c8', '#c8c8c8', '#c8c8c8', '#c8c8c8', '#cacaca', '#c9c9c9']
 	}

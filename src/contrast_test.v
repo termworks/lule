@@ -1,5 +1,6 @@
 module main
 
+import config
 import color
 import math
 
@@ -30,8 +31,8 @@ fn test_contrast_ratio_known_values() {
 }
 
 fn test_resolve_contrast_reads_the_setting() {
-	assert resolve_contrast(0.0) == contrast_aa // unset means the default
-	assert resolve_contrast(contrast_aaa) == contrast_aaa
+	assert resolve_contrast(0.0) == color.contrast_aa // unset means the default
+	assert resolve_contrast(color.contrast_aaa) == color.contrast_aaa
 	assert resolve_contrast(3.0) == 3.0
 	assert resolve_contrast(-1.0) == 0.0 // negative is the explicit off
 }
@@ -39,9 +40,9 @@ fn test_resolve_contrast_reads_the_setting() {
 fn test_raise_contrast_reaches_the_threshold() {
 	background := color.color_from_hex('#101820')
 	for hex in ['#1a2430', '#22303f', '#2b2b2b', '#3f51b5', '#101821'] {
-		raised := raise_contrast(color.color_from_hex(hex), background, contrast_aa)
+		raised := raise_contrast(color.color_from_hex(hex), background, color.contrast_aa)
 		got := color.contrast_ratio(raised.quantised(), background.quantised())
-		assert got >= contrast_aa, '${hex} only reached ${got}'
+		assert got >= color.contrast_aa, '${hex} only reached ${got}'
 	}
 }
 
@@ -51,24 +52,24 @@ fn test_the_guarantee_holds_after_rounding_to_hex() {
 	// check has to be on the value that gets written.
 	background := color.color_from_hex('#141414')
 	for hex in ['#2a2a2a', '#333333', '#404040', '#1f2a1f', '#2b1f2b'] {
-		raised := raise_contrast(color.color_from_hex(hex), background, contrast_aa)
+		raised := raise_contrast(color.color_from_hex(hex), background, color.contrast_aa)
 		// Round-trip through hex, exactly as the cache file does.
 		written := color.color_from_hex(raised.to_hex(true))
-		assert color.contrast_ratio(written, background) >= contrast_aa, '${hex} failed after rounding'
+		assert color.contrast_ratio(written, background) >= color.contrast_aa, '${hex} failed after rounding'
 	}
 }
 
 fn test_raise_contrast_leaves_a_readable_colour_alone() {
 	background := color.color_from_hex('#101820')
 	already := color.color_from_hex('#ffffff')
-	assert raise_contrast(already, background, contrast_aa).to_hex(true) == '#ffffff'
+	assert raise_contrast(already, background, color.contrast_aa).to_hex(true) == '#ffffff'
 }
 
 fn test_raise_contrast_keeps_the_hue() {
 	// Only lightness moves. A colour that changes hue to become readable is a different colour.
 	background := color.color_from_hex('#101820')
 	original := color.color_from_hex('#1b2f1b')
-	raised := raise_contrast(original, background, contrast_aa)
+	raised := raise_contrast(original, background, color.contrast_aa)
 	assert close(raised.to_hsl().h, original.to_hsl().h, 1.0)
 }
 
@@ -76,12 +77,12 @@ fn test_raise_contrast_moves_away_from_the_background() {
 	// On a light background a dark colour gets darker, not flipped to the other end.
 	light := color.color_from_rgb(250, 250, 250)
 	dark := color.color_from_hex('#9a9a9a')
-	raised := raise_contrast(dark, light, contrast_aa)
+	raised := raise_contrast(dark, light, color.contrast_aa)
 	assert raised.relative_luminance() < dark.relative_luminance()
 
 	night := color.color_from_rgb(5, 5, 5)
 	dim := color.color_from_hex('#2a2a2a')
-	lifted := raise_contrast(dim, night, contrast_aa)
+	lifted := raise_contrast(dim, night, color.contrast_aa)
 	assert lifted.relative_luminance() > dim.relative_luminance()
 }
 
@@ -89,13 +90,13 @@ fn test_an_impossible_threshold_gives_the_most_readable_it_can() {
 	// Nothing reaches AAA against a mid grey: white is only 3.9 away and black only 5.3. The
 	// answer is the more readable extreme, not a crash and not the colour unchanged.
 	grey := color.color_from_rgb(128, 128, 128)
-	raised := raise_contrast(color.color_from_hex('#7a7a7a'), grey, contrast_aaa)
+	raised := raise_contrast(color.color_from_hex('#7a7a7a'), grey, color.contrast_aaa)
 	hex := raised.to_hex(true)
 	assert hex == '#ffffff' || hex == '#000000', 'got ${hex}'
 }
 
 fn test_enforce_contrast_covers_the_ansi_sixteen() {
-	mut scheme := Scheme{
+	mut scheme := config.Scheme{
 		theme:    'dark'
 		pigments: sample_pigments()
 	}
@@ -103,17 +104,17 @@ fn test_enforce_contrast_covers_the_ansi_sixteen() {
 	background := colors[0]
 	for i in 1 .. 16 {
 		got := color.contrast_ratio(colors[i].quantised(), background.quantised())
-		assert got >= contrast_aa, 'colour ${i} is only ${got} against the background'
+		assert got >= color.contrast_aa, 'colour ${i} is only ${got} against the background'
 	}
 }
 
 fn test_enforce_contrast_can_be_turned_off() {
-	mut on := Scheme{
+	mut on := config.Scheme{
 		theme:    'dark'
 		pigments: sample_pigments()
 		seed:     11
 	}
-	mut off := Scheme{
+	mut off := config.Scheme{
 		theme:    'dark'
 		pigments: sample_pigments()
 		seed:     11
@@ -133,13 +134,13 @@ fn test_enforce_contrast_can_be_turned_off() {
 fn test_enforce_contrast_leaves_the_background_and_the_ramps_alone() {
 	// Slot 0 is what everything is measured against, and the ramps past 15 are gradients rather
 	// than text colours.
-	mut scheme := Scheme{
+	mut scheme := config.Scheme{
 		theme:    'dark'
 		pigments: sample_pigments()
 		seed:     3
 	}
 	colors := get_all_colors(mut scheme)
-	enforced := enforce_contrast(colors, contrast_aa)
+	enforced := enforce_contrast(colors, color.contrast_aa)
 	assert enforced[0].to_hex(true) == colors[0].to_hex(true)
 	for i in 16 .. colors.len {
 		assert enforced[i].to_hex(true) == colors[i].to_hex(true)
@@ -148,7 +149,7 @@ fn test_enforce_contrast_leaves_the_background_and_the_ramps_alone() {
 
 fn test_enforce_contrast_ignores_a_short_palette() {
 	short := [color.color_from_rgb(0, 0, 0), color.color_from_rgb(1, 1, 1)]
-	assert enforce_contrast(short, contrast_aa).len == 2
+	assert enforce_contrast(short, color.contrast_aa).len == 2
 }
 
 fn test_the_other_direction_is_tried_when_the_first_cannot_reach() {
@@ -157,14 +158,14 @@ fn test_the_other_direction_is_tried_when_the_first_cannot_reach() {
 	// and quietly failed the guarantee.
 	background := color.color_from_rgb(250, 250, 250)
 	slightly_lighter := color.color_from_rgb(253, 253, 253)
-	raised := raise_contrast(slightly_lighter, background, contrast_aa)
+	raised := raise_contrast(slightly_lighter, background, color.contrast_aa)
 	got := color.contrast_ratio(raised.quantised(), background.quantised())
-	assert got >= contrast_aa, 'only reached ${got} (${raised.to_hex(true)})'
+	assert got >= color.contrast_aa, 'only reached ${got} (${raised.to_hex(true)})'
 }
 
 fn test_light_backgrounds_are_handled() {
 	// The whole ANSI sixteen, on a light theme.
-	mut scheme := Scheme{
+	mut scheme := config.Scheme{
 		theme:    'light'
 		pigments: sample_pigments()
 		seed:     8
@@ -172,6 +173,6 @@ fn test_light_backgrounds_are_handled() {
 	colors := get_all_colors(mut scheme)
 	for i in 1 .. 16 {
 		got := color.contrast_ratio(colors[i].quantised(), colors[0].quantised())
-		assert got >= contrast_aa, 'colour ${i} is only ${got}'
+		assert got >= color.contrast_aa, 'colour ${i} is only ${got}'
 	}
 }

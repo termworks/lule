@@ -1,5 +1,6 @@
 module main
 
+import config
 import color
 import rand
 import math
@@ -230,7 +231,7 @@ pub fn sort_palette(mut palette []color.Color, mode string) {
 // Applied to the pigments rather than to the finished 256, so the scheme stays internally
 // consistent: the background is still derived from the accent, the ramp still runs dark to light,
 // and nothing has to be clamped back into place afterwards.
-pub fn adjust_palette(palette []color.Color, scheme &Scheme) []color.Color {
+pub fn adjust_palette(palette []color.Color, scheme &config.Scheme) []color.Color {
 	mut out := []color.Color{}
 	for c in palette {
 		hsl := c.to_hsl()
@@ -260,7 +261,7 @@ pub fn adjust_palette(palette []color.Color, scheme &Scheme) []color.Color {
 	return out
 }
 
-pub fn get_all_colors(mut scheme Scheme) []color.Color {
+pub fn get_all_colors(mut scheme config.Scheme) []color.Color {
 	theme := scheme.is_dark()
 
 	seed_rand(scheme.seed)
@@ -339,10 +340,6 @@ pub fn get_all_colors(mut scheme Scheme) []color.Color {
 	return enforce_contrast(colors, resolve_contrast(scheme.contrast))
 }
 
-// The WCAG AA threshold for body text. Terminal colours are body text.
-pub const contrast_aa = 4.5
-pub const contrast_aaa = 7.0
-
 // Reads `--contrast`. Zero means the flag was never given, so the default applies; a negative
 // value is the explicit "leave my colours alone".
 pub fn resolve_contrast(setting f64) f64 {
@@ -350,7 +347,7 @@ pub fn resolve_contrast(setting f64) f64 {
 		return 0.0
 	}
 	if setting == 0.0 {
-		return contrast_aa
+		return color.contrast_aa
 	}
 	return setting
 }
