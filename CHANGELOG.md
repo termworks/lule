@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.3] - 2026-08-22
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Warn when $LULE_C holds no config
+
 ## [0.5.2] - 2026-08-22
 
 ### <!-- 0 -->⛰️  Features

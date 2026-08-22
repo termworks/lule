@@ -5,7 +5,7 @@ module cmd
 // "unknown function", while the file on disk looked perfectly correct.
 import os
 
-pub const version = '0.5.2'
+pub const version = '0.5.3'
 pub const description = "a command line to set 255 colors on tty's and other places that use ANSI colors"
 
 pub struct Args {
