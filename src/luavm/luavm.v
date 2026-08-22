@@ -216,6 +216,15 @@ pub fn (mut s State) set_index(i int) {
 	C.lua_rawseti(s.handle, -2, i64(i))
 }
 
+// Sets `name` to a string, as a global.
+//
+// Interpolating a path straight into a chunk would break on the first apostrophe in it, so a value
+// that came from the filesystem is handed over rather than spliced into source.
+pub fn (mut s State) set_global_text(name string, value string) {
+	C.lua_pushlstring(s.handle, value.str, usize(value.len))
+	C.lua_setglobal(s.handle, name.str)
+}
+
 // Registers `name` as a global function.
 pub fn (mut s State) register_global(name string, f Fn) {
 	C.lua_pushcclosure(s.handle, voidptr(f), 0)

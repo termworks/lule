@@ -26,17 +26,32 @@ pub fn config_path(config_dir string) string {
 // big one: `lule.on.colors` can be called as often as it likes, and each handler is named at the
 // point it is written. It also means the settings are read off this table after the config has
 // run, so the file needs no `return` at all.
+// Run before anything else, with the config's directory handed over as a global rather than
+// spliced into the source.
+const config_path_setup = "local dir = LULE_CONFIG_DIR
+LULE_CONFIG_DIR = nil
+package.path = dir .. '/?.lua;' .. dir .. '/?/init.lua;' .. package.path
+"
+
 const lule_module = "local lule = {}
 
 lule.templates = {}
 lule.handlers = { colors = {} }
 lule.on = {}
 
--- Named so the order in the file is the order they render in, and so a warning can say which one
--- is wrong by name rather than by position.
+-- Keyed on the name, so registering one twice replaces it rather than rendering twice - that is
+-- what lets a file required from the config override a template it set up. The list keeps its
+-- order, and a replacement keeps the position the original had, so overriding one does not
+-- reshuffle the rest.
 function lule.template(name, spec)
   local t = spec or {}
   t.name = name
+  for i, existing in ipairs(lule.templates) do
+    if existing.name == name then
+      lule.templates[i] = t
+      return t
+    end
+  end
   lule.templates[#lule.templates + 1] = t
   return t
 end
@@ -120,6 +135,18 @@ pub fn load_lua(mut scheme Scheme) Hooks {
 	}
 
 	mut vm := luavm.new()
+
+	// A config gets to `require` the files beside it, which is what lets one be split up: a second
+	// file requires the module and registers more, and needs no return value to be merged.
+	//
+	// Without this the search path is the one Lua was built with - for a nix build, a store path
+	// that has nothing to do with the user - so `require("colors")` next to init.lua failed.
+	vm.set_global_text('LULE_CONFIG_DIR', scheme.config)
+	vm.run(config_path_setup, 'lule path') or {
+		eprintln('${ui.red_bold('error:')} ${err}')
+		exit(1)
+	}
+	vm.pop(1)
 
 	// The module is defined before the config runs, so `require("lule")` finds it already loaded
 	// and never touches the filesystem looking for a lule.lua.

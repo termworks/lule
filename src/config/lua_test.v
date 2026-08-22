@@ -180,3 +180,38 @@ lule.template("a", { input = "/in/a", output = "/out/a" })')
 	assert scheme.patterns.len == 2
 	assert scheme.patterns[0].from == '/already'
 }
+
+// Rule 2's keyed form: a registration with an identity replaces rather than accumulating, which is
+// what lets a file required from the config override what it set up.
+fn test_registering_a_template_name_twice_replaces_it() {
+	dir := lua_config('override', 'local lule = require("lule")
+lule.template("kitty", { input = "/in/a", output = "/out/a" })
+lule.template("waybar", { input = "/in/b", output = "/out/b" })
+lule.template("kitty", { input = "/in/c", output = "/out/c" })')
+	defer {
+		os.rmdir_all(dir) or {}
+	}
+	s := read_lua_config(dir)
+	assert s.patterns.len == 2, 'the second kitty should replace the first'
+	// The replacement keeps the position the original held, so an override does not reshuffle.
+	assert s.patterns[0].from == '/in/c'
+	assert s.patterns[1].from == '/in/b'
+}
+
+// Rule 4's registered escape: a config can be split, because the file beside it can be required.
+fn test_a_config_can_require_the_files_beside_it() {
+	dir := lua_config('split', 'local lule = require("lule")
+lule.theme = "light"
+require("more")')
+	defer {
+		os.rmdir_all(dir) or {}
+	}
+	os.write_file(os.join_path(dir, 'more.lua'), 'local lule = require("lule")
+lule.template("from_fragment", { input = "/in/f", output = "/out/f" })') or {
+		panic(err)
+	}
+	s := read_lua_config(dir)
+	assert s.theme == 'light'
+	assert s.patterns.len == 1, 'the required file registered nothing'
+	assert s.patterns[0].from == '/in/f'
+}

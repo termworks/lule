@@ -94,9 +94,9 @@ Settings are `wallpaper`, `theme`, `palette`, `contrast`, `scheme`, `sort`, `sat
 `illumination`, `hue`, `blend`, `seed`, `loop`, `norandom` and `cache` — the flags, by the same
 names. One the config never mentions is left alone.
 
-`lule.template(name, spec)` registers a template; the name is only so a warning can say *which*
-one is wrong. The order they are called in is the order they render in, and `lule.templates` is
-the list being appended to, so it can be assigned outright instead.
+`lule.template(name, spec)` registers a template, keyed on its name: registering the same name
+again replaces it rather than adding a second. The order they are called in is the order they
+render in, and `lule.templates` is the list being registered into, so it can be assigned outright.
 
 Precedence runs **file, then environment, then flags** - a flag always wins. `~` is expanded by
 lule, since nothing in a config file passes through a shell. `--pattern` *adds to* what the file
@@ -139,7 +139,7 @@ lule.on.colors(reload_desktop)
 ```
 
 Handlers run in the order they were registered, and one that raises is reported without stopping
-the ones after it.
+the ones after it. A handler is pure side effect — whatever it returns is ignored.
 
 `c` is the finished scheme: `c.colors` (all 256), `c.ansi` (the sixteen), `c.background`,
 `c.foreground`, `c.cursor`, `c.accent`, `c.wallpaper`, `c.theme`, `c.cache`. Lists count from one,
@@ -155,6 +155,28 @@ so `c.colors[1]` is colour 0.
 Paths take `~`. `lule.read` and `lule.env` answer `nil` when there is nothing there, so
 `lule.read(p) or "default"` reads the way it looks. A failing hook is reported and the run stands:
 the colours are already written by then, and throwing them away would be worse.
+
+### Splitting the config up
+
+A config can `require` the files beside it, so it does not have to be one file. The second file
+requires the module and registers more; it returns nothing, and nothing has to merge it.
+
+```lua
+-- ~/.config/lule/init.lua
+local lule = require("lule")
+lule.theme = "dark"
+require("terminals")
+
+-- ~/.config/lule/terminals.lua
+local lule = require("lule")
+lule.template("kitty", { input = "…", output = "…" })
+lule.on.colors(function(c) ... end)
+```
+
+`lule.template` is keyed on its name, so registering `kitty` again later replaces it rather than
+rendering twice — that is how a required file's template gets overridden. The replacement keeps the
+position the original had, so overriding one does not reshuffle the others. `lule.on.colors`
+accumulates instead: handlers for one event are meant to add up.
 
 ## Environment
 
