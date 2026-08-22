@@ -28,13 +28,6 @@ pub fn environment(mut scheme Scheme) {
 	if v := os.getenv_opt('LULE_C') {
 		scheme.config = v
 	}
-	if v := os.getenv_opt('LULE_S') {
-		if v.trim_space() != '' {
-			mut newvec := [v]
-			newvec << scheme.scripts
-			scheme.scripts = newvec
-		}
-	}
 	if v := os.getenv_opt('LULE_A') {
 		scheme.cache = v
 	}
@@ -92,15 +85,9 @@ fn tuning(a &cmd.Args, mut scheme Scheme) {
 }
 
 pub fn arguments(a &cmd.Args, mut scheme Scheme) {
-	if a.multi['script'].len > 0 {
-		mut scripts := scheme.scripts.clone()
-		scripts << a.multi['script']
-		scheme.scripts = scripts
-	}
-
-	// Added to whatever config.toml already listed, rather than replacing it — the same way
-	// --script adds to $LULE_S. Replacing meant a one-off `--pattern` silently switched off every
-	// template the config file had set up, so the colours changed and nothing else did.
+	// Added to whatever the config file already listed rather than replacing it. Replacing meant a
+	// one-off `--pattern` silently switched off every template the config had set up, so the
+	// colours changed and nothing else did.
 	if a.multi['pattern'].len > 0 {
 		mut patterns := scheme.patterns.clone()
 		for val in a.multi['pattern'] {
@@ -256,24 +243,6 @@ pub fn resolve(a &cmd.Args, mut scheme Scheme, needs_image bool) Hooks {
 	environment(mut scheme)
 	arguments(a, mut scheme)
 	piped(mut scheme)
-
-	// Scripts survive in the cached scheme, so clearing $LULE_S does not stop them running — the
-	// list was already persisted by an earlier run. This is the switch that actually does.
-	if a.present['no-scripts'] || a.present['n'] {
-		scheme.scripts = []
-	}
-
-	if scheme.scripts.len > 0 {
-		mut seen := map[string]bool{}
-		mut deduped := []string{}
-		for s in scheme.scripts {
-			if s.trim_space() != '' && !seen[s] {
-				seen[s] = true
-				deduped << s
-			}
-		}
-		scheme.scripts = deduped
-	}
 
 	if needs_image && scheme.image == '' && scheme.walldir == '' {
 		eprintln('${ui.red_bold('error:')} Environment variable ${ui.yellow("'\$LULE_W'")} is empty')

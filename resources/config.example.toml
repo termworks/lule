@@ -34,8 +34,3 @@ output = "~/.config/kitty/colors.conf"
 [templates.waybar]
 input = "~/.config/lule/templates/waybar.css"
 output = "~/.config/waybar/colors.css"
-
-# Run after the colours are written and the templates rendered - usually to make
-# the programs above pick the new files up.
-[scripts]
-after = ["~/.local/bin/reload-colors"]

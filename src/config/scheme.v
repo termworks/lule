@@ -19,7 +19,6 @@ pub mut:
 	walldir      string
 	config       string @[skip]
 	cache        string @[skip]
-	scripts      []string
 	patterns     []Pattern
 	looop        int
 	palette      string
@@ -59,9 +58,6 @@ pub fn (mut s Scheme) modi(new Scheme) {
 	}
 	if new.cache != '' {
 		s.cache = new.cache
-	}
-	if new.scripts.len > 0 {
-		s.scripts = new.scripts.clone()
 	}
 	if new.patterns.len > 0 {
 		s.patterns = new.patterns.clone()

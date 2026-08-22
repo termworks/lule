@@ -1,7 +1,6 @@
 module config
 
 import os
-import cmd
 
 fn write_scheme_file(dir string, name string, body string) string {
 	path := os.join_path(dir, name)
@@ -52,9 +51,4 @@ fn test_named_scheme_finds_suffixed_files() {
 	}
 	write_scheme_file(tmp, 'nord.txt', '#2e3440\n#88c0d0\n')
 	assert named_scheme(tmp, 'nord') == ['#2e3440', '#88c0d0']
-}
-
-fn test_no_scripts_flag_is_recognised() {
-	assert cmd.parse_args(['create', '--no-scripts', '--', 'set']).present['no-scripts']
-	assert cmd.parse_args(['create', '-n', '--', 'set']).present['n']
 }

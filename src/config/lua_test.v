@@ -136,21 +136,11 @@ return lule.setup({
 	assert s.patterns[0].from == '/in/a'
 }
 
-fn test_scripts_are_read() {
-	dir := lua_config('scripts', 'local lule = require("lule")
-return lule.setup({ scripts = { "/one.sh", "/two.sh" } })')
-	defer {
-		os.rmdir_all(dir) or {}
-	}
-	assert read_lua_config(dir).scripts == ['/one.sh', '/two.sh']
-}
-
 fn test_tilde_is_expanded() {
 	dir := lua_config('tilde', 'local lule = require("lule")
 return lule.setup({
   settings = { wallpaper = "~/pictures" },
   templates = { lule.template("t", { input = "~/in", output = "~/out" }) },
-  scripts = { "~/s.sh" },
 })')
 	defer {
 		os.rmdir_all(dir) or {}
@@ -159,7 +149,6 @@ return lule.setup({
 	home := os.home_dir()
 	assert s.walldir == os.join_path(home, 'pictures')
 	assert s.patterns[0].from == os.join_path(home, 'in')
-	assert s.scripts[0] == os.join_path(home, 's.sh')
 	assert !s.walldir.contains('~')
 }
 

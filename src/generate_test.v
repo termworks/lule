@@ -98,7 +98,6 @@ fn test_scheme_json_roundtrip() {
 		theme:    'light'
 		pigments: ['#111111', '#222222']
 		walldir:  '/w'
-		scripts:  ['/s.sh']
 		patterns: [config.Pattern{'/in', '/out'}]
 		looop:    42
 		palette:  'pigment'
@@ -112,7 +111,6 @@ fn test_scheme_json_roundtrip() {
 	assert back.theme == original.theme
 	assert back.pigments == original.pigments
 	assert back.walldir == original.walldir
-	assert back.scripts == original.scripts
 	assert back.looop == original.looop
 	assert back.norandom == original.norandom
 	assert back.patterns.len == 1

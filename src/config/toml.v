@@ -9,8 +9,7 @@ import cmd
 // The config file lives beside the named schemes, in $LULE_C or ~/.config/lule.
 //
 // It exists because the alternative is unusable: eight templates meant eight `--pattern=in:out`
-// flags on every single invocation, and $LULE_S could name exactly one script. Everything here
-// can still be overridden by a flag.
+// flags on every single invocation. Everything here can still be overridden by a flag.
 pub const config_name = 'config.toml'
 
 pub fn config_path(config_dir string) string {
@@ -43,7 +42,6 @@ pub fn load(mut scheme Scheme) Hooks {
 	settings := doc.value('settings')
 	apply_settings(settings, mut scheme)
 	apply_templates(doc.value('templates'), mut scheme, path)
-	apply_scripts(doc.value('scripts'), mut scheme)
 	return Hooks{}
 }
 
@@ -127,24 +125,6 @@ fn apply_templates(templates toml.Any, mut scheme Scheme, from string) {
 		patterns << Pattern{expand_home(input), expand_home(output)}
 	}
 	scheme.patterns = patterns
-}
-
-fn apply_scripts(scripts toml.Any, mut scheme Scheme) {
-	list := scripts.value('after').array()
-	if list.len == 0 {
-		return
-	}
-	mut all := scheme.scripts.clone()
-	for entry in list {
-		if entry is toml.Null {
-			continue
-		}
-		text := entry.string()
-		if text.trim_space() != '' {
-			all << expand_home(text)
-		}
-	}
-	scheme.scripts = all
 }
 
 // A missing key comes back as toml.Null, whose .string() is a debug rendering of the type rather

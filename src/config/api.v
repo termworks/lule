@@ -7,9 +7,9 @@ import luavm
 // The `lule.*` functions a config can call, and the `after` hook that gets to call them once the
 // colours exist.
 //
-// This is what replaces a post-generation shell script. Everything the shipped `lule_colors`
-// script did — copy files about, write out a format lule has no template for, send escape
-// sequences to every open terminal, reload a compositor — is one of these.
+// This is what replaces a post-generation shell script. Everything such a script did — copy files
+// about, write out a format lule has no template for, send escape sequences to every open
+// terminal, reload a compositor — is one of these.
 
 // Paths coming from a config are written by a person, so `~` is expanded here too. Nothing in a
 // config file passes through a shell that would have done it.

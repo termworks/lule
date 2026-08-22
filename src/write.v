@@ -27,7 +27,7 @@ pub fn write_temp(scheme &config.Scheme) {
 // Copying meant the cache picked up whatever a *previous* run had left at the fixed temp paths:
 // `--palette=<something unknown>` extracted no pigments, and the cache was then filled from an
 // earlier run's /tmp/lule_palette — a scheme built out of another wallpaper's colours, reported
-// as success. The temp files are still written for scripts that read them; they are just no
+// as success. The temp files are still written for anything that reads them; they are just no
 // longer the route the cache is filled by.
 pub fn write_cache(scheme &config.Scheme) {
 	if scheme.cache == '' {

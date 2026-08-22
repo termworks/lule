@@ -21,8 +21,8 @@ pub fn write_to_file(path string, content string) {
 		eprintln('${ui.red_bold('error:')} Could not write into ${ui.yellow(path)} -> ${err}')
 		exit(1)
 	}
-	// The scheme names the wallpaper directory and every script that will be run; that is nobody
-	// else's business on a shared machine.
+	// The scheme names the wallpaper directory and every path it writes; that is nobody else's
+	// business on a shared machine.
 	os.chmod(path, 0o600) or {}
 }
 

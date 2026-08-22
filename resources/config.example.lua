@@ -1,8 +1,8 @@
 -- lule's configuration. Put this at ~/.config/lule/config.lua, or wherever $LULE_C points.
 --
 -- Settings are defaults: the environment overrides them, and a command-line flag overrides both.
--- The `after` hook runs once the colours, the cache, the templates and the scripts are all done,
--- and is where a post-generation shell script would otherwise go.
+-- The `after` hook runs once the colours, the cache and the templates are all done, and is where
+-- a post-generation shell script would otherwise go.
 
 local lule = require("lule")
 
@@ -31,7 +31,7 @@ return lule.setup({
     return out
   end)(),
 
-  -- Everything a post-generation script used to do.
+  -- Everything a post-generation shell script would otherwise do.
   --
   -- `c` is the finished scheme: c.colors (all 256), c.ansi (the sixteen), c.background,
   -- c.foreground, c.cursor, c.accent, c.wallpaper, c.theme, c.cache. Lists count from one, so

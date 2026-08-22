@@ -79,9 +79,7 @@ jobs:
         run: |
           set -euo pipefail
           cache="$(mktemp -d)"
-          # LULE_S names the caller's real colour-applying script. A runner has none, but an
-          # empty value is the explicit statement that none should run.
-          export LULE_A="$cache" LULE_S=""
+          export LULE_A="$cache"
           ./target/lule --version
           ./target/lule create --image=resources/theme_dark.png -- set
           count="$(grep -c . "$cache/colors")"

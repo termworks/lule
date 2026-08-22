@@ -21,12 +21,9 @@ lule create -- set
 
 In order for lule to work properly, you need to set the following environment variables:
 - `LULE_W` : The path to the wallpaper (one random image will be selected from this directory)
-- `LULE_S` : The path to the script that will be run after the colors are generated
-(please check the 'scripts/apply_colors.sh' file for an example)
 
 ```
 export LULE_W="~/.wallpaper"
-export LULE_S="~/.func/lule_colors.sh"
 
 lule create -- set
 ```
@@ -92,7 +89,6 @@ end
 return lule.setup({
   settings  = { theme = "dark", contrast = "aa", palette = "pigment" },
   templates = templates,
-  scripts   = { "~/.local/bin/reload-colors" },
 })
 ```
 
@@ -101,8 +97,8 @@ is wrong; a bare `{ input = …, output = … }` is just as valid. Templates are
 in the file is the order they render in.
 
 Precedence runs **file, then environment, then flags** - a flag always wins. `~` is expanded by
-lule, since nothing in a config file passes through a shell. `--pattern` and `--script` *add to*
-what the file lists rather than replacing it.
+lule, since nothing in a config file passes through a shell. `--pattern` *adds to* what the file
+lists rather than replacing it.
 
 A broken config stops the run rather than falling back to defaults, and Lua names the file and
 line: `config.lua:12: syntax error near '='`. Carrying on would quietly apply a scheme you did not
@@ -112,8 +108,8 @@ A `config.toml` is still read when there is no `config.lua`. Same keys, no loops
 
 ### Doing things once the colours exist
 
-`after` runs when the colours, the cache, the templates and the scripts are all done. It is where
-a post-generation shell script would otherwise go.
+`after` runs once the colours, the cache and the templates are all done. It is where a
+post-generation shell script would otherwise go.
 
 ```lua
 after = function(c)
@@ -153,7 +149,6 @@ the colours are already written by then, and throwing them away would be worse.
 | variable | what |
 |---|---|
 | `LULE_W` | directory to pick a wallpaper from at random |
-| `LULE_S` | script to run once the colors are generated |
 | `LULE_C` | directory holding named color schemes |
 | `LULE_A` | directory to write the color cache into |
 | `LULE_STDIN_MS` | how long to wait for a piped scheme (default 250ms) |
@@ -238,15 +233,6 @@ lule daemon -- stop
 
 Only one daemon runs at a time; a second refuses to start rather than fighting the first over the
 control pipe.
-
-## Running nothing
-
-`lule create -- set` runs whatever `$LULE_S` names, and that list is remembered in the cached
-scheme — so clearing the variable does not stop it. `--no-scripts` (or `-n`) does:
-
-```
-lule create -n --image=~/wall.png -- set
-```
 
 ## Templates
 

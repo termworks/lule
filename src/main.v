@@ -25,7 +25,6 @@ fn cmd_colors(a &cmd.Args, mut scheme config.Scheme) {
 	defer {
 		hooks.close()
 	}
-	scheme.scripts = []
 
 	if a.present['g'] {
 		write_colors(mut scheme, false, mut hooks)

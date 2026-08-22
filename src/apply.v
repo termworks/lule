@@ -57,18 +57,14 @@ pub fn write_colors(mut scheme config.Scheme, old bool, mut hooks config.Hooks) 
 	write_temp(scheme)
 	write_cache(scheme)
 	write_cache_json(scheme, values)
-	// Before the scripts, not after: a script's usual job is to reload the programs whose config
-	// these templates just rewrote, and reloading them before the rewrite reloads the old colours.
+	// Before the `after` hook, so a hook that reloads a program is reloading the config this just
+	// rewrote rather than the previous one.
 	//
 	// This was only ever called from the hidden `test` subcommand, so `--pattern` silently did
 	// nothing during normal use - and the config file's whole purpose is templates on `create`.
 	pattern_generation(scheme)
 
-	if scheme.scripts.len > 0 {
-		command_execution(scheme)
-	}
-
-	// Last, once the colours, the cache, the templates and the scripts are all done — so the hook
-	// sees the same finished state anything else would.
+	// Last, once the colours, the cache and the templates are all written — so the hook sees the
+	// same finished state anything else would.
 	hooks.after(scheme)
 }

@@ -19,7 +19,7 @@ pub mut:
 
 pub const subcommands = ['create', 'daemon', 'colors', 'config', 'test']
 
-pub const multi_flags = ['pattern', 'script']
+pub const multi_flags = ['pattern']
 
 // The palette extractors that exist. `--palette` used to accept anything.
 pub fn known_palettes() []string {
@@ -125,8 +125,6 @@ pub fn print_help(logo string) {
 	println('        --configs=<PATH>       specify a dir to load color configs from')
 	println('        --cache=<PATH>         specify a dir where to dump color caches')
 	println('        --pattern=<PATH:PATH>  specify a path to substitute pattern colors')
-	println('        --script=<PATH>        specify a script to run after colors are generated')
-	println('    -n, --no-scripts           generate colors but run no scripts at all')
 	println('    -h, --help                 Prints help information')
 	println('    -V, --version              Prints version information')
 	println('')

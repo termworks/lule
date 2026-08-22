@@ -12,7 +12,7 @@ import luavm
 //   return lule.setup({
 //     settings  = { theme = "dark", contrast = "aa" },
 //     templates = { lule.template("kitty", { input = "…", output = "…" }) },
-//     scripts   = { "~/.local/bin/reload-colors" },
+//     after     = function(c) lule.ttys(sequences_for(c)) end,
 //   })
 //
 // Preferred over config.toml when both exist. The toml loader stays for anyone who wants
@@ -40,10 +40,6 @@ function lule.template(name, spec)
   local t = spec or {}
   t.name = name
   return t
-end
-
-function lule.script(path)
-  return path
 end
 
 package.loaded['lule'] = lule
@@ -125,7 +121,6 @@ pub fn load_lua(mut scheme Scheme) Hooks {
 
 	read_lua_settings(mut vm, mut scheme)
 	read_lua_templates(mut vm, mut scheme, path)
-	read_lua_scripts(mut vm, mut scheme)
 
 	// Parked in the registry so the hook can be found again once the colours exist.
 	return Hooks{
@@ -222,26 +217,6 @@ fn read_lua_templates(mut vm luavm.State, mut scheme Scheme, from string) {
 		vm.pop(1)
 	}
 	scheme.patterns = patterns
-}
-
-fn read_lua_scripts(mut vm luavm.State, mut scheme Scheme) {
-	vm.field('scripts')
-	defer {
-		vm.pop(1)
-	}
-	if !vm.top_is_table() {
-		return
-	}
-	mut all := scheme.scripts.clone()
-	total := vm.len()
-	for i := 1; i <= total; i++ {
-		vm.index(i)
-		if text := vm.as_text() {
-			all << expand_home(text)
-		}
-		vm.pop(1)
-	}
-	scheme.scripts = all
 }
 
 // Reading one field is always push, look, pop — so the helpers keep the three together and the

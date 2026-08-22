@@ -179,10 +179,7 @@ make.recipe{
     local tmp <close> = oslo.fs.mktempdir()
     local cache = tmp.path
 
-    -- LULE_S would run whatever the caller has wired to their real colour-applying script, which
-    -- is not something a test gets to do. Empty rather than unset: the env is inherited.
     oslo.env.set("LULE_A", cache)
-    oslo.env.set("LULE_S", "")
     local made = oslo.run{ BIN, "create", "--image=resources/theme_dark.png", "--", "set" }
     assert(made.ok, "lule create failed: " .. (made.err or ""))
 

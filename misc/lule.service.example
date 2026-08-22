@@ -11,7 +11,6 @@ WorkingDirectory=/home/%i
 
 # Set required environment variables
 Environment="LULE_W=/home/%i/.wallpaper"
-Environment="LULE_S=/home/%i/.config/lule/apply_colors.sh"
 Environment="LULE_C=/home/%i/.config/lule/config.json"
 Environment="LULE_A=/home/%i/.cache/lule"
 

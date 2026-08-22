@@ -126,15 +126,6 @@ input = "/in/b"
 	assert s.patterns[0].from == '/in/a'
 }
 
-fn test_scripts_are_read() {
-	dir := config_in('scripts', '[scripts]\nafter = ["/one.sh", "/two.sh"]\n')
-	defer {
-		os.rmdir_all(dir) or {}
-	}
-	s := read_toml_config(dir)
-	assert s.scripts == ['/one.sh', '/two.sh']
-}
-
 fn test_tilde_is_expanded() {
 	// Nothing in a toml file goes through a shell, so a literal `~/x` would be created as a
 	// directory called `~`.
@@ -144,9 +135,6 @@ wallpaper = "~/pictures"
 [templates.t]
 input = "~/in.tpl"
 output = "~/out.conf"
-
-[scripts]
-after = ["~/s.sh"]
 ')
 	defer {
 		os.rmdir_all(dir) or {}
@@ -156,7 +144,6 @@ after = ["~/s.sh"]
 	assert s.walldir == os.join_path(home, 'pictures')
 	assert s.patterns[0].from == os.join_path(home, 'in.tpl')
 	assert s.patterns[0].to == os.join_path(home, 'out.conf')
-	assert s.scripts[0] == os.join_path(home, 's.sh')
 	assert !s.walldir.contains('~')
 }
 
@@ -168,7 +155,6 @@ fn test_an_empty_config_changes_nothing() {
 	s := read_toml_config(dir)
 	assert s.theme == ''
 	assert s.patterns.len == 0
-	assert s.scripts.len == 0
 }
 
 fn test_config_adds_to_patterns_rather_than_replacing() {
