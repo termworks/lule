@@ -1,0 +1,13 @@
+{
+  "wallpaper": "{{ wallpaper }}",
+  "theme": "{{ theme }}",
+  "special": {
+    "background": "{{ background.hex }}",
+    "foreground": "{{ foreground.hex }}",
+    "cursor": "{{ cursor.hex }}",
+    "accent": "{{ accent.hex }}"
+  },
+  "colors": {
+<* for c in ansi *>    "color{{ loop_index }}": "{{ c.hex }}"<* if not loop_last *>,<* endif *>
+<* endfor *>  }
+}

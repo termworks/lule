@@ -1,22 +1,33 @@
 module main
 
+import wallpaper
+import config
+import paths
+import ui
+import color
 import os
+import cmd
 
-fn cmd_create(a &Args, mut scheme Scheme) {
-	concatinate(a, mut scheme, a.action != 'regen')
+fn cmd_create(a &cmd.Args, mut scheme config.Scheme) {
+	mut hooks := config.resolve(a, mut scheme, a.action != 'regen')
+	defer {
+		hooks.close()
+	}
 	match a.action {
-		'set' { write_colors(mut scheme, false) }
-		'regen' { write_colors(mut scheme, true) }
-		else { write_colors(mut scheme, false) }
+		'set' { write_colors(mut scheme, false, mut hooks) }
+		'regen' { write_colors(mut scheme, true, mut hooks) }
+		else { write_colors(mut scheme, false, mut hooks) }
 	}
 }
 
-fn cmd_colors(a &Args, mut scheme Scheme) {
-	concatinate(a, mut scheme, a.present['g'])
-	scheme.scripts = []
+fn cmd_colors(a &cmd.Args, mut scheme config.Scheme) {
+	mut hooks := config.resolve(a, mut scheme, a.present['g'])
+	defer {
+		hooks.close()
+	}
 
 	if a.present['g'] {
-		write_colors(mut scheme, false)
+		write_colors(mut scheme, false, mut hooks)
 	}
 
 	if scheme.cache != '' {
@@ -24,20 +35,20 @@ fn cmd_colors(a &Args, mut scheme Scheme) {
 		if cached.len > 0 {
 			scheme.colors = cached
 		}
-		if content := file_to_string(os.join_path(scheme.cache, 'wallpaper')) {
+		if content := paths.file_to_string(os.join_path(scheme.cache, 'wallpaper')) {
 			scheme.image = content
 		}
-		if content := file_to_string(os.join_path(scheme.cache, 'theme')) {
+		if content := paths.file_to_string(os.join_path(scheme.cache, 'theme')) {
 			scheme.theme = content
 		}
 	}
 
 	if scheme.colors.len == 0 {
-		eprintln('${red_bold('error:')} no colors cached yet - run ${yellow('lule create -- set')} first')
+		eprintln('${ui.red_bold('error:')} no colors cached yet - run ${ui.yellow('lule create -- set')} first')
 		exit(1)
 	}
 
-	cols, rows := term_size()
+	cols, rows := ui.term_size()
 	action := if a.action == '' { 'ansii' } else { a.action }
 
 	// Ahead of the tty check, because being piped is exactly when json is asked for. Everything
@@ -47,9 +58,9 @@ fn cmd_colors(a &Args, mut scheme Scheme) {
 		return
 	}
 
-	if !is_tty_stdout() {
-		for color in scheme.colors {
-			println(color.to_hex(true))
+	if !ui.is_tty_stdout() {
+		for swatch in scheme.colors {
+			println(swatch.to_hex(true))
 		}
 		return
 	}
@@ -82,40 +93,43 @@ fn pad_for(cols int) int {
 	return (cols - 56) / 16
 }
 
-fn cmd_config(a &Args, mut scheme Scheme) {
-	concatinate(a, mut scheme, false)
+fn cmd_config(a &cmd.Args, mut scheme config.Scheme) {
+	mut hooks := config.resolve(a, mut scheme, false)
+	defer {
+		hooks.close()
+	}
 	payload := scheme.to_json()
-	if !is_tty_stdout() {
+	if !ui.is_tty_stdout() {
 		println(payload)
 	} else {
-		write_to_file(temp_path('lule_pipe'), payload)
+		paths.write_to_file(paths.temp_path('lule_pipe'), payload)
 	}
 }
 
-fn cmd_test(a &Args, mut scheme Scheme) {
-	defs_concatinate(mut scheme)
-	envi_concatinate(mut scheme)
-	args_concatinate(a, mut scheme)
-	pipe_concatinate(mut scheme)
+fn cmd_test(a &cmd.Args, mut scheme config.Scheme) {
+	config.defaults(mut scheme)
+	config.environment(mut scheme)
+	config.arguments(a, mut scheme)
+	config.piped(mut scheme)
 
 	if scheme.image == '' {
 		if scheme.walldir == '' {
-			eprintln('${red_bold('error:')} no image or wallpath given')
+			eprintln('${ui.red_bold('error:')} no image or wallpath given')
 			exit(1)
 		}
-		scheme.image = random_image(scheme.walldir)
+		scheme.image = wallpaper.random_image(scheme.walldir)
 	}
 
-	palette := palette_from_image(scheme.image)
+	palette := palette_from_image(scheme.image, scheme.palette)
 	scheme.pigments = palette
 	scheme.colors = get_all_colors(mut scheme)
 
-	cols, rows := term_size()
+	cols, rows := ui.term_size()
 	display_image(scheme.image, cols - 10, rows - 13) or {}
 	println('Palette')
-	mut colors := []Color{}
+	mut colors := []color.Color{}
 	for hexstr in palette {
-		colors << color_from_hex(hexstr)
+		colors << color.color_from_hex(hexstr)
 	}
 	show_specified_colors(colors, pad_for(cols))
 	println('\n6th')
@@ -128,21 +142,21 @@ fn cmd_test(a &Args, mut scheme Scheme) {
 
 fn main() {
 	argv := os.args[1..]
-	mut scheme := Scheme{}
+	mut scheme := config.Scheme{}
 
 	if argv.len == 0 {
-		print_help(read_logo())
+		cmd.print_help(cmd.read_logo())
 		return
 	}
 
-	a := parse_args(argv)
+	a := cmd.parse_args(argv)
 
 	if a.present['help'] || a.present['h'] {
-		print_help(read_logo())
+		cmd.print_help(cmd.read_logo())
 		return
 	}
 	if a.present['version'] || a.present['V'] {
-		println('lule ${version}')
+		println('lule ${cmd.version}')
 		return
 	}
 
@@ -157,14 +171,17 @@ fn main() {
 			cmd_config(a, mut scheme)
 		}
 		'daemon' {
-			concatinate(a, mut scheme, a.action == 'start' || a.action == 'detach')
-			run_daemon(a, mut scheme)
+			mut hooks := config.resolve(a, mut scheme, a.action == 'start' || a.action == 'detach')
+			defer {
+				hooks.close()
+			}
+			run_daemon(a, mut scheme, mut hooks)
 		}
 		'test' {
 			cmd_test(a, mut scheme)
 		}
 		else {
-			print_help(read_logo())
+			cmd.print_help(cmd.read_logo())
 		}
 	}
 }

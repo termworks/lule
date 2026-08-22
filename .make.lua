@@ -41,6 +41,72 @@ local function static_flags()
   return "-static"
 end
 
+---------------------------------------------------------------------------- saying what was built
+
+local function absolute(path)
+  if oslo.path.is_absolute(path) then return oslo.path.normalize(path) end
+  return oslo.path.normalize(oslo.path.join(oslo.fs.cwd(), path))
+end
+
+-- Whether `dir` is somewhere `$PATH` already looks.
+--
+-- Compared as absolute paths, because `$PATH` carries whatever spelling was put in it and
+-- `./target` and `/home/…/target` are the same directory.
+local function on_path(dir)
+  local want = absolute(dir)
+  for entry in ((os.getenv("PATH") or "") .. ":"):gmatch("([^:]*):") do
+    if entry ~= "" and absolute(entry) == want then return true end
+  end
+  return false
+end
+
+-- `1213280` → `1,213,280`. A number this long is read in groups or not at all.
+local function grouped(n)
+  local text = tostring(math.floor(n))
+  local out = text:sub(-3)
+  local at = #text - 3
+  while at > 0 do
+    out = text:sub(math.max(1, at - 2), at) .. "," .. out
+    at = at - 3
+  end
+  return out
+end
+
+-- Painted through the shell's own styling, so `NO_COLOR` and a pipe both answer the plain text and
+-- the caller never checks.
+local function dim(text)
+  return oslo.ui.style(text, { dim = true })
+end
+
+local function line(label, value)
+  print(dim(oslo.ui.pad(label, 8)) .. value)
+end
+
+-- Where the binary is, what it weighs, and whether you can actually run it by name.
+--
+-- The last row is the one that earns its place: a build that succeeded and a `$PATH` that does not
+-- reach it look identical until you type `lule` and get the *installed* one instead.
+local function report(path)
+  local stat = oslo.fs.stat(path)
+  if not stat then return end
+  local dir = oslo.path.parent(path)
+  local megabytes = ("%.2f MB"):format(stat.size / 1048576)
+
+  print("")
+  print(oslo.ui.title(("%s %s   %s"):format(NAME, VERSION, megabytes)))
+  line("binary", path)
+  -- Bytes beside megabytes: `1.16 MB` cannot be subtracted from last week's `1.13 MB` to get one.
+  line("size", megabytes .. dim("   " .. grouped(stat.size) .. " bytes"))
+  line("linking", oslo.ui.style("✓ static", { fg = "green" }) .. dim("   no runtime dependencies"))
+  if on_path(dir) then
+    line("path", oslo.ui.style("✓ on $PATH", { fg = "green" }) .. dim("  " .. dir))
+  else
+    line("path", oslo.ui.style("✗ not on $PATH", { fg = "yellow" }))
+    print(oslo.ui.subtitle(('         add to .env.lua:  oslo.direnv.path_add("%s")'):format(dir)))
+  end
+  print("")
+end
+
 ---------------------------------------------------------------------------- building
 
 -- The `Makefile` this replaced printed a banner on every target with `$(info …)`, including the
@@ -49,9 +115,24 @@ end
 make.recipe{ name = "version", desc = "what this checkout calls itself",
              run = function() print(("%s v%s"):format(NAME, VERSION)) end }
 
+-- **Two recipes, because a skipped recipe prints nothing.**
+--
+-- The staleness declaration belongs to the compile, so a second `make build` with nothing changed
+-- does not link again. But that also skipped the report, and a build that says nothing looks the
+-- same as one that did not run. This one always runs and always answers; the one it delegates to
+-- is the one allowed to be skipped.
 make.recipe{
   name = "build",
   desc = "the static release binary",
+  run = function()
+    make.run("_compile")
+    report(BIN)
+  end,
+}
+
+make.recipe{
+  name = "_compile",
+  desc = "compile the static release binary",
   inputs = SOURCES,
   outputs = { BIN },
   stale = "content",
@@ -62,7 +143,6 @@ make.recipe{
     -- anywhere.
     sh.v("-prod", "-cflags", static_flags(), SRC, "-o", BIN)
     make.run("check-static")
-    print(("%s  %.2f MB"):format(BIN, oslo.fs.stat(BIN).size / 1048576))
   end,
 }
 
@@ -116,6 +196,24 @@ make.recipe{ name = "clean", desc = "remove the build artifacts",
 make.recipe{ name = "compile", desc = "clean, then build", deps = { "clean", "build" } }
 make.alias("c", "compile")
 
+
+-- Directories containing a `*_test.v`, deduplicated. Two globs because `src/**` does not match
+-- files sitting directly in `src/`.
+local function test_dirs()
+  local seen, dirs = {}, {}
+  for _, pattern in ipairs({ "src/*_test.v", "src/**/*_test.v" }) do
+    for _, file in ipairs(oslo.fs.glob(pattern)) do
+      local dir = file:match("^(.*)/[^/]+$") or "."
+      if not seen[dir] then
+        seen[dir] = true
+        dirs[#dirs + 1] = dir
+      end
+    end
+  end
+  table.sort(dirs)
+  return dirs
+end
+
 ---------------------------------------------------------------------------- the gate
 
 make.recipe{ name = "check", desc = "vet the source",
@@ -135,8 +233,17 @@ make.recipe{
   desc = "the V tests, then a smoke test of the built binary",
   deps = { "build" },
   run = function()
+    -- Every directory holding a test, discovered rather than listed.
+    --
+    -- `v test src/` does not recurse into the module directories under it, so the moment a module
+    -- was extracted its tests silently stopped running while the gate still reported green.
+    -- Deriving the list means adding a module cannot quietly drop its tests.
+    local dirs = test_dirs()
+    assert(#dirs > 0, "no test files found; the suite cannot be empty")
     -- Strict `sh`, so a failing V test fails the gate. `oslo.run` here would swallow the status.
-    sh.v("test", SRC)
+    -- Unpacked, not passed as a table: `sh` takes words. Safe in final position, where multiple
+    -- return values are not truncated to one.
+    sh.v("test", table.unpack(dirs))
     make.run("smoke")
   end,
 }
@@ -152,10 +259,7 @@ make.recipe{
     local tmp <close> = oslo.fs.mktempdir()
     local cache = tmp.path
 
-    -- LULE_S would run whatever the caller has wired to their real colour-applying script, which
-    -- is not something a test gets to do. Empty rather than unset: the env is inherited.
     oslo.env.set("LULE_A", cache)
-    oslo.env.set("LULE_S", "")
     local made = oslo.run{ BIN, "create", "--image=resources/theme_dark.png", "--", "set" }
     assert(made.ok, "lule create failed: " .. (made.err or ""))
 
@@ -215,7 +319,11 @@ make.recipe{
     local dest = (os.getenv("DESTDIR") or "") .. PREFIX .. "/bin"
     sh.install("-d", dest)
     sh.install("-m", "755", BIN, dest .. "/" .. NAME)
-    print("installed " .. dest .. "/" .. NAME)
+    print(oslo.ui.style("✓ ", { fg = "green" }) .. dest .. "/" .. NAME)
+    if not on_path(dest) then
+      print(oslo.ui.subtitle(("  %s is not on $PATH, so `%s` still finds something else")
+        :format(dest, NAME)))
+    end
   end,
 }
 

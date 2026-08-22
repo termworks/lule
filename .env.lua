@@ -19,16 +19,11 @@ oslo.env.set("TOP_HEAD", oslo.sys.pwd())
 -- and neither needs it for anything done in here.
 oslo.env.unset("GITHUB_TOKEN")
 
--- lule's own inputs, pointed at the checkout rather than at the real ones. `create -- set` runs
--- whatever $LULE_S names, so leaving the real script in scope means a test build repaints the
--- desktop; and $LULE_W on this machine points at a directory that does not exist, which turns a
--- daemon into an error message about a missing wallpaper folder.
---
--- Empty rather than unset for LULE_S: it is inherited from the login environment, and unsetting a
--- variable a parent exported is what the undo record is for — but the code path being avoided
--- here reads "set and non-empty", so empty is the clearer statement.
+-- lule's own inputs, pointed at the checkout rather than at the real ones. A test build writes its
+-- cache under target/ rather than over the desktop's, and $LULE_W on this machine points at a
+-- directory that does not exist, which turns a daemon into an error about a missing wallpaper
+-- folder.
 oslo.env.set("LULE_W", oslo.sys.pwd() .. "/resources")
-oslo.env.set("LULE_S", "")
 oslo.env.set("LULE_A", oslo.sys.pwd() .. "/target/cache")
 
 -- The commands this repository is driven by. All unload with the directory, so they cannot fire
@@ -38,3 +33,4 @@ oslo.env.set_alias("_c", "make check")
 oslo.env.set_alias("_r", "make run")
 oslo.env.set_alias("_t", "make test")
 oslo.env.set_alias("_v", "make verify")
+oslo.env.set_alias("_i", "make install")

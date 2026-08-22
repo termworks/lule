@@ -1,4 +1,4 @@
-module main
+module cmd
 
 fn test_subcommand_and_trailing_action() {
 	a := parse_args(['create', '--image=wall.png', '--', 'set'])
@@ -8,7 +8,7 @@ fn test_subcommand_and_trailing_action() {
 }
 
 fn test_action_without_the_separator() {
-	// `lule create set` means the same as `lule create -- set`; scripts write both.
+	// `lule create set` means the same as `lule create -- set`; both are written in the wild.
 	a := parse_args(['create', 'set'])
 	assert a.subcommand == 'create'
 	assert a.action == 'set'
@@ -29,11 +29,10 @@ fn test_flag_aliases_are_normalised() {
 }
 
 fn test_repeatable_flags_accumulate() {
-	a := parse_args(['--pattern=a:b', '--pattern=c:d', '--script=/s1', '--script=/s2', 'test'])
+	a := parse_args(['--pattern=a:b', '--pattern=c:d', 'test'])
 	assert a.multi['pattern'].len == 2
 	assert a.multi['pattern'][0] == 'a:b'
 	assert a.multi['pattern'][1] == 'c:d'
-	assert a.multi['script'].len == 2
 	assert a.subcommand == 'test'
 }
 

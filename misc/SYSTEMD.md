@@ -28,25 +28,17 @@ mkdir -p ~/.config/lule
 mkdir -p ~/.cache/lule
 ```
 
-### 3. Set Up Your Script
+### 3. Set Up Your Config
 
-Copy and customize the example script:
+Copy and customize the example config:
 
 ```bash
-cp scripts/apply_colors.sh ~/.config/lule/apply_colors.sh
-chmod +x ~/.config/lule/apply_colors.sh
+cp resources/init.example.lua ~/.config/lule/init.lua
 ```
 
-**Important**: Edit `~/.config/lule/apply_colors.sh` and replace hardcoded paths:
-- Replace `/home/bresilla/` with `$HOME/` or your actual home directory
-- Example: Change line 55 from:
-  ```bash
-  sed -i "s/fill=\"#\([^\"]*\)\"/fill=\"$col1\"/" /home/bresilla/.config/bresilla.svg
-  ```
-  to:
-  ```bash
-  sed -i "s/fill=\"#\([^\"]*\)\"/fill=\"$col1\"/" $HOME/.config/bresilla.svg
-  ```
+Its `lule.on.colors` handlers are what run once the colours exist — writing files, sending escape
+sequences to open terminals, reloading whatever needs reloading. See the "Doing things once the
+colours exist" section of the README.
 
 ### 4. Install Systemd Service
 
@@ -65,7 +57,6 @@ WorkingDirectory=%h
 
 # Environment variables
 Environment="LULE_W=%h/.wallpaper"
-Environment="LULE_S=%h/.config/lule/apply_colors.sh"
 Environment="LULE_A=%h/.cache/lule"
 
 # Command
@@ -132,7 +123,6 @@ You can also run lule in the background using the detach mode:
 
 ```bash
 export LULE_W="$HOME/.wallpaper"
-export LULE_S="$HOME/.config/lule/apply_colors.sh"
 lule daemon detach
 ```
 
@@ -148,18 +138,16 @@ This will:
 1. Check logs: `journalctl --user -u lule.service -n 50`
 2. Verify environment variables are set correctly
 3. Ensure directories exist: `~/.wallpaper`, `~/.cache/lule`
-4. Make sure script is executable: `chmod +x ~/.config/lule/apply_colors.sh`
 
 ### No wallpapers found
 
 - Put wallpaper images in `~/.wallpaper/`
 - Or set `LULE_W` to your wallpaper directory
 
-### Script not executing
+### The colour handlers not running
 
-- Check script permissions: `ls -l ~/.config/lule/apply_colors.sh`
-- Test script manually: `bash ~/.config/lule/apply_colors.sh`
-- Verify `LULE_S` environment variable is set correctly
+- Check the config is where lule looks: `~/.config/lule/init.lua`, or `$LULE_C`
+- Run `lule create -- set` by hand; a broken config names its own file and line
 
 ### Colors not applying to terminals
 
@@ -186,6 +174,5 @@ When running as a daemon without active TTY sessions, the `/dev/pts/*` writing w
 
 ### Remaining Limitations
 
-- The `apply_colors.sh` script writes to `/dev/pts/*` which requires active terminal sessions
+- `lule.ttys()` writes to `/dev/pts/*`, which requires active terminal sessions
 - Some color changes may not apply to already-running terminal emulators
-- Hardcoded user paths in script need manual adjustment

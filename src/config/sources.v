@@ -1,12 +1,16 @@
-module main
+module config
 
+import wallpaper
+import paths
+import ui
 import os
+import cmd
 
 #include <poll.h>
 
-fn defs_concatinate(mut scheme Scheme) {
+pub fn defaults(mut scheme Scheme) {
 	config_dir := os.config_dir() or {
-		eprintln('${red_bold('error:')} Path for configs is impossible to get')
+		eprintln('${ui.red_bold('error:')} Path for configs is impossible to get')
 		exit(1)
 	}
 	cache_dir := os.cache_dir()
@@ -17,27 +21,20 @@ fn defs_concatinate(mut scheme Scheme) {
 	scheme.palette = 'pigment'
 }
 
-fn envi_concatinate(mut scheme Scheme) {
+pub fn environment(mut scheme Scheme) {
 	if v := os.getenv_opt('LULE_W') {
 		scheme.walldir = v
 	}
 	if v := os.getenv_opt('LULE_C') {
 		scheme.config = v
 	}
-	if v := os.getenv_opt('LULE_S') {
-		if v.trim_space() != '' {
-			mut newvec := [v]
-			newvec << scheme.scripts
-			scheme.scripts = newvec
-		}
-	}
 	if v := os.getenv_opt('LULE_A') {
 		scheme.cache = v
 	}
 }
 
-fn temp_concatinate(mut scheme Scheme) {
-	if content := file_to_string(temp_path('lule_scheme')) {
+fn cached(mut scheme Scheme) {
+	if content := paths.file_to_string(paths.temp_path('lule_scheme')) {
 		if sh := scheme_from_json(content) {
 			config := scheme.config
 			cache := scheme.cache
@@ -46,16 +43,21 @@ fn temp_concatinate(mut scheme Scheme) {
 			scheme.cache = cache
 		}
 	}
-	// Both are per-invocation choices, not settings. Persisting the named scheme meant one
+	// Per-invocation choices, not settings. Persisting the named scheme meant one
 	// `--scheme=gruvbox` poisoned the temp scheme, and every later `lule create` — with no
 	// --scheme at all — failed looking for it, until /tmp/lule_scheme was deleted by hand.
+	//
+	// Templates are cleared for the same reason: they are re-supplied by the config file and by
+	// --pattern on every run, so keeping the previous run's set only lets stale paths pile up
+	// and get rewritten for ever.
 	scheme.image = ''
 	scheme.scheme = ''
+	scheme.patterns = []
 }
 
 // The palette-tuning flags, shared by `create` and `test` so a setting can be previewed with the
 // command that draws it and then applied with the command that saves it.
-fn tuning_concatinate(a &Args, mut scheme Scheme) {
+fn tuning(a &cmd.Args, mut scheme Scheme) {
 	if v := a.flags['saturation'] {
 		scheme.saturation = v.f64()
 	}
@@ -74,24 +76,26 @@ fn tuning_concatinate(a &Args, mut scheme Scheme) {
 	if v := a.flags['seed'] {
 		scheme.seed = v.int()
 	}
+	if v := a.flags['contrast'] {
+		scheme.contrast = parse_contrast(v)
+	}
 	if a.present['norandom'] {
 		scheme.norandom = true
 	}
 }
 
-fn args_concatinate(a &Args, mut scheme Scheme) {
-	if a.multi['script'].len > 0 {
-		mut scripts := scheme.scripts.clone()
-		scripts << a.multi['script']
-		scheme.scripts = scripts
-	}
-
+pub fn arguments(a &cmd.Args, mut scheme Scheme) {
+	// Added to whatever the config file already listed rather than replacing it. Replacing meant a
+	// one-off `--pattern` silently switched off every template the config had set up, so the
+	// colours changed and nothing else did.
 	if a.multi['pattern'].len > 0 {
-		mut patterns := []Pattern{}
+		mut patterns := scheme.patterns.clone()
 		for val in a.multi['pattern'] {
 			parts := val.split(':')
 			if parts.len == 2 {
 				patterns << Pattern{parts[0], parts[1]}
+			} else {
+				eprintln('${ui.yellow('warning:')} --pattern=${val} is not IN:OUT')
 			}
 		}
 		scheme.patterns = patterns
@@ -107,10 +111,10 @@ fn args_concatinate(a &Args, mut scheme Scheme) {
 	match a.subcommand {
 		'create' {
 			if v := a.flags['image'] {
-				scheme.image = valid_image(v)
+				scheme.image = wallpaper.valid_image(v)
 			} else if v := a.flags['wallpath'] {
 				scheme.walldir = v
-				scheme.image = random_image(v)
+				scheme.image = wallpaper.random_image(v)
 			}
 			if v := a.flags['theme'] {
 				scheme.theme = v
@@ -118,9 +122,10 @@ fn args_concatinate(a &Args, mut scheme Scheme) {
 			if v := a.flags['palette'] {
 				// Anything else extracted no pigments at all and then reported success, so the
 				// scheme was built from whatever happened to be cached already.
-				if v !in known_palettes {
-					eprintln('${red_bold('error:')} unknown palette ${yellow(v)}')
-					eprintln('${red_bold('error:')} known palettes: ${known_palettes.join(', ')}')
+				known := cmd.known_palettes()
+				if v !in known {
+					eprintln('${ui.red_bold('error:')} unknown palette ${ui.yellow(v)}')
+					eprintln('${ui.red_bold('error:')} known palettes: ${known.join(', ')}')
 					exit(1)
 				}
 				scheme.palette = v
@@ -128,7 +133,7 @@ fn args_concatinate(a &Args, mut scheme Scheme) {
 			if v := a.flags['scheme'] {
 				scheme.scheme = v
 			}
-			tuning_concatinate(a, mut scheme)
+			tuning(a, mut scheme)
 		}
 		'config' {
 			if v := a.flags['theme'] {
@@ -145,12 +150,12 @@ fn args_concatinate(a &Args, mut scheme Scheme) {
 		}
 		'test' {
 			if v := a.flags['image'] {
-				scheme.image = valid_image(v)
+				scheme.image = wallpaper.valid_image(v)
 			}
 			if v := a.flags['theme'] {
 				scheme.theme = v
 			}
-			tuning_concatinate(a, mut scheme)
+			tuning(a, mut scheme)
 		}
 		else {}
 	}
@@ -185,8 +190,8 @@ fn stdin_ready(timeout_ms int) bool {
 // it down, so the hang moved rather than went away.
 //
 // $LULE_STDIN_MS overrides the deadline for a slow producer.
-fn pipe_concatinate(mut scheme Scheme) {
-	if is_tty_stdin() {
+pub fn piped(mut scheme Scheme) {
+	if ui.is_tty_stdin() {
 		return
 	}
 	mut budget := 250
@@ -225,36 +230,26 @@ fn pipe_concatinate(mut scheme Scheme) {
 // is a source required: `create -- regen`, `colors` without `-g`, `config` and `daemon stop`
 // all read what is already in the cache, and demanding $LULE_W from them made every one of them
 // fail on a machine that has no wallpaper directory configured at all.
-pub fn concatinate(a &Args, mut scheme Scheme, needs_image bool) {
-	temp_concatinate(mut scheme)
-	defs_concatinate(mut scheme)
-	envi_concatinate(mut scheme)
-	args_concatinate(a, mut scheme)
-	pipe_concatinate(mut scheme)
-
-	// Scripts survive in the cached scheme, so clearing $LULE_S does not stop them running — the
-	// list was already persisted by an earlier run. This is the switch that actually does.
-	if a.present['no-scripts'] || a.present['n'] {
-		scheme.scripts = []
-	}
-
-	if scheme.scripts.len > 0 {
-		mut seen := map[string]bool{}
-		mut deduped := []string{}
-		for s in scheme.scripts {
-			if s.trim_space() != '' && !seen[s] {
-				seen[s] = true
-				deduped << s
-			}
-		}
-		scheme.scripts = deduped
-	}
+pub fn resolve(a &cmd.Args, mut scheme Scheme, needs_image bool) Hooks {
+	cached(mut scheme)
+	defaults(mut scheme)
+	// Where the config lives is settled before it is read, because that is the one thing the
+	// file cannot tell us. $LULE_C and --configs are the only two settings resolved this early;
+	// everything else the environment and the flags say is applied afterwards, on top.
+	locate_config(a, mut scheme)
+	// Lowest of the three a user controls: the file is overridden by the environment, and both
+	// by a flag on the command line.
+	mut hooks := load_lua(mut scheme)
+	environment(mut scheme)
+	arguments(a, mut scheme)
+	piped(mut scheme)
 
 	if needs_image && scheme.image == '' && scheme.walldir == '' {
-		eprintln('${red_bold('error:')} Environment variable ${yellow("'\$LULE_W'")} is empty')
-		eprintln('${red_bold('error:')} Argument option ${yellow("'--wallpath'")} is not set')
-		eprintln('${red_bold('error:')} Image argument ${yellow("'--image'")} is not given')
-		eprintln('\n${yellow('USAGE')}\n\tlule help <subcommands>...\n\nFor more information try ${blue('--help')}')
+		eprintln('${ui.red_bold('error:')} Environment variable ${ui.yellow("'\$LULE_W'")} is empty')
+		eprintln('${ui.red_bold('error:')} Argument option ${ui.yellow("'--wallpath'")} is not set')
+		eprintln('${ui.red_bold('error:')} Image argument ${ui.yellow("'--image'")} is not given')
+		eprintln('\n${ui.yellow('USAGE')}\n\tlule help <subcommands>...\n\nFor more information try ${ui.blue('--help')}')
 		exit(1)
 	}
+	return hooks
 }

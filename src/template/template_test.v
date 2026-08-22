@@ -1,18 +1,19 @@
-module main
+module template
 
+import color
 import os
 
 fn ctx() map[string]TplValue {
 	return {
-		'background': TplValue(color_from_hex('#101820'))
-		'accent':     TplValue(color_from_hex('#3f51b5'))
-		'red':        TplValue(color_from_hex('#ff0000'))
+		'background': TplValue(color.color_from_hex('#101820'))
+		'accent':     TplValue(color.color_from_hex('#3f51b5'))
+		'red':        TplValue(color.color_from_hex('#ff0000'))
 		'theme':      TplValue('dark')
 		'dark':       TplValue(true)
 		'light':      TplValue(false)
 		'empty':      TplValue('')
-		'colors':     TplValue([color_from_hex('#111111'), color_from_hex('#222222'),
-			color_from_hex('#333333')])
+		'colors':     TplValue([color.color_from_hex('#111111'),
+			color.color_from_hex('#222222'), color.color_from_hex('#333333')])
 	}
 }
 
@@ -52,15 +53,15 @@ fn test_whitespace_inside_braces_is_optional() {
 fn test_colour_filters() {
 	// Lightening raises lightness and darkening lowers it; the exact value is the colour code's
 	// business, the direction is this engine's.
-	lighter := color_from_hex(render_ok('{{ accent | lighten: 0.2 }}'))
-	darker := color_from_hex(render_ok('{{ accent | darken: 0.2 }}'))
-	base := color_from_hex('#3f51b5')
+	lighter := color.color_from_hex(render_ok('{{ accent | lighten: 0.2 }}'))
+	darker := color.color_from_hex(render_ok('{{ accent | darken: 0.2 }}'))
+	base := color.color_from_hex('#3f51b5')
 	assert lighter.to_lab().l > base.to_lab().l
 	assert darker.to_lab().l < base.to_lab().l
 
 	assert render_ok('{{ red | invert }}') == '00ffff'
 	assert render_ok('{{ red | grayscale }}') == render_ok('{{ red | grayscale }}')
-	grey := color_from_hex(render_ok('{{ red | grayscale }}'))
+	grey := color.color_from_hex(render_ok('{{ red | grayscale }}'))
 	r, g, b := grey.rgb_u8()
 	assert r == g && g == b
 }
@@ -165,24 +166,6 @@ fn test_a_bad_filter_argument_is_reported() {
 fn test_unknown_control_tags_survive() {
 	// A stray `<* ... *>` in a config file is not ours to swallow.
 	assert render_ok('a <* whatever *> b') == 'a <* whatever *> b'
-}
-
-fn test_template_context_exposes_the_scheme() {
-	mut scheme := Scheme{
-		theme:    'light'
-		image:    '/w/a.png'
-		pigments: ['#123456', '#654321']
-	}
-	scheme.colors = get_all_colors(mut scheme)
-	c := template_context(&scheme)
-
-	assert c['theme'] or { TplValue('') }.display() == 'light'
-	assert c['wallpaper'] or { TplValue('') }.display() == '/w/a.png'
-	assert c['dark'] or { TplValue(true) }.display() == 'false'
-	assert c['light'] or { TplValue(false) }.display() == 'true'
-	// color0..color255, plus the named aliases.
-	assert (c['color0'] or { TplValue('') }).display() == (c['background'] or { TplValue('x') }).display()
-	assert (c['color255'] or { TplValue('') }).display().len == 6
 }
 
 fn test_malformed_input_terminates_and_keeps_the_text() {
@@ -587,4 +570,12 @@ fn test_a_bad_range_end_is_reported() {
 fn test_ranges_and_lists_still_coexist() {
 	assert render_ok('<* for c in colors *>{{ c.hex }}<* endfor *>') == '#111111#222222#333333'
 	assert render_ok('<* for i in 0..2 *>{{ i }}<* endfor *>') == '01'
+}
+
+fn test_ansi_is_absent_for_a_short_palette() {
+	// Nothing to expose, and a loop over a missing name reports rather than inventing one.
+	_, problems := render('<* for x in ansi *>{{ x }}<* endfor *>', {
+		'theme': TplValue('dark')
+	})
+	assert problems.len == 1
 }

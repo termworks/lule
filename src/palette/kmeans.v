@@ -1,14 +1,15 @@
-module main
+module palette
 
+import color
 import rand
 import stbi
 
 // Index of and distance to the closest mean
-fn nearest(color Lab, means []Lab) (int, f64) {
+fn nearest(target color.Lab, means []color.Lab) (int, f64) {
 	mut best := 0
-	mut best_d := delta_e_cie76(color, means[0])
+	mut best_d := color.delta_e_cie76(target, means[0])
 	for i := 1; i < means.len; i++ {
-		d := delta_e_cie76(color, means[i])
+		d := color.delta_e_cie76(target, means[i])
 		if d < best_d {
 			best_d = d
 			best = i
@@ -17,7 +18,7 @@ fn nearest(color Lab, means []Lab) (int, f64) {
 	return best, best_d
 }
 
-fn recalculate(pixels []Lab, assign []int, cluster int) Lab {
+fn recalculate(pixels []color.Lab, assign []int, cluster int) color.Lab {
 	mut w_sum := 0.0
 	mut l := 0.0
 	mut a := 0.0
@@ -32,14 +33,14 @@ fn recalculate(pixels []Lab, assign []int, cluster int) Lab {
 		b += px.b
 	}
 	if w_sum == 0.0 {
-		return Lab{0.0, 0.0, 0.0, 1.0}
+		return color.Lab{0.0, 0.0, 0.0, 1.0}
 	}
-	return Lab{l / w_sum, a / w_sum, b / w_sum, 1.0}
+	return color.Lab{l / w_sum, a / w_sum, b / w_sum, 1.0}
 }
 
 pub struct Pigment {
 pub mut:
-	color     Lab
+	color     color.Lab
 	dominance f64
 }
 
@@ -62,10 +63,10 @@ fn weighted_pick(weights []f64) int {
 	return weights.len - 1
 }
 
-// K-means++ clustering in CIE Lab space
-pub fn palette_kmeans(pixels []Lab, k int, max_iter int) []Pigment {
+// K-means++ clustering in CIE color.Lab space
+pub fn palette_kmeans(pixels []color.Lab, k int, max_iter int) []Pigment {
 	tolerance := 1e-4
-	if pixels.len == 0 {
+	if pixels.len == 0 || k < 1 {
 		return []Pigment{}
 	}
 
@@ -103,7 +104,7 @@ pub fn palette_kmeans(pixels []Lab, k int, max_iter int) []Pigment {
 		mut changed := false
 		for i := 0; i < means.len; i++ {
 			new_mean := recalculate(pixels, assign, i)
-			if delta_e_cie76(means[i], new_mean) > tolerance {
+			if color.delta_e_cie76(means[i], new_mean) > tolerance {
 				changed = true
 			}
 			means[i] = new_mean
@@ -126,7 +127,7 @@ pub fn palette_kmeans(pixels []Lab, k int, max_iter int) []Pigment {
 }
 
 // Nearest-neighbour downscale so clustering stays fast on 4K wallpapers
-fn sample_pixels(path string, max_dim int) ![]Lab {
+fn sample_pixels(path string, max_dim int) ![]color.Lab {
 	img := stbi.load(path, desired_channels: 3)!
 	defer {
 		unsafe { img.free() }
@@ -151,14 +152,14 @@ fn sample_pixels(path string, max_dim int) ![]Lab {
 		th = 1
 	}
 
-	mut pixels := []Lab{cap: tw * th}
+	mut pixels := []color.Lab{cap: tw * th}
 	for y := 0; y < th; y++ {
 		sy := int(f64(y) * f64(img.height) / f64(th))
 		for x := 0; x < tw; x++ {
 			sx := int(f64(x) * f64(img.width) / f64(tw))
 			o := (sy * img.width + sx) * 3
 			unsafe {
-				c := color_from_rgb(src[o], src[o + 1], src[o + 2])
+				c := color.color_from_rgb(src[o], src[o + 1], src[o + 2])
 				pixels << c.to_lab()
 			}
 		}
@@ -166,9 +167,21 @@ fn sample_pixels(path string, max_dim int) ![]Lab {
 	return pixels
 }
 
-pub fn pigments(image_path string, count int, iters int) ![]Pigment {
+// Dispatches to whichever extractor was asked for. They all take the same sampled pixels and
+// return the same shape, so the rest of the pipeline neither knows nor cares which ran.
+pub fn pigments(image_path string, count int, iters int, backend string) ![]Pigment {
 	pixels := sample_pixels(image_path, 512)!
-	mut output := palette_kmeans(pixels, count, iters)
-	output.sort(a.dominance > b.dominance)
+	mut output := match backend {
+		'median' { palette_median_cut(pixels, count) }
+		'histogram' { palette_histogram(pixels, count) }
+		'tonal' { palette_tonal(pixels, count) }
+		else { palette_kmeans(pixels, count, iters) }
+	}
+
+	// tonal is already ordered as a ramp, dark to light; re-sorting it by dominance would shuffle
+	// the one backend whose order carries meaning.
+	if backend != 'tonal' {
+		output.sort(a.dominance > b.dominance)
+	}
 	return output
 }

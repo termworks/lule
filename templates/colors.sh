@@ -1,6 +1,6 @@
 #!/bin/sh
 
-wallpaper="#{{ wallpaper }}"
+wallpaper="{{ wallpaper }}"
 
 # Special
 background='#{{ background }}'

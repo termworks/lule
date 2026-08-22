@@ -13,8 +13,8 @@
       let
         pkgs = import nixpkgs { inherit system; };
 
-        # `-static` needs libc.a and libdl.a, which nixpkgs keeps in a separate output rather
-        # than in the default glibc.
+        # `-static` needs libc.a and libdl.a, which nixpkgs keeps in a separate output rather than
+        # in the default glibc.
         #
         # Deliberately *not* a `buildInputs` entry. As one it goes into NIX_LDFLAGS, which the
         # compiler wrapper applies to every link — including the ordinary dynamic one `make dev`
@@ -22,7 +22,12 @@
         # "IFUNC symbol 'memset' ... creates an unsatisfiable circular dependency". Only the
         # static build wants this path, so only the static build is given it: `.make.lua` reads
         # GLIBC_STATIC and passes `-L` itself.
-        staticEnv = { GLIBC_STATIC = pkgs.glibc.static; };
+        # Lua comes from nixpkgs rather than being vendored, so none of its C source lives in this
+        # repository and the version is pinned by flake.lock like everything else. The package
+        # ships liblua.a, so the release binary stays one static file.
+        buildEnv = {
+          GLIBC_STATIC = pkgs.glibc.static;
+        };
 
         # Everything needed to compile and check the source, and nothing else. CI enters this
         # rather than the full shell so it does not pull mdbook, gh and git-cliff — none of which
@@ -38,20 +43,25 @@
           # binary that still carries an INTERP and will not start.
           pkgs.binutils
           pkgs.file
+
+          # Lua, and the pkg-config that tells the compiler where its headers and archive are.
+          # Nothing of Lua is vendored: the version is pinned by flake.lock like the rest.
+          pkgs.lua5_4
+          pkgs.pkg-config
         ];
       in
       {
         # The version of V is pinned in exactly one place: this flake's nixpkgs, through
         # flake.lock. CI enters `.#ci` rather than installing a V of its own, so there is no
         # second pin that can drift out from under `v fmt -verify`.
-        devShells.ci = pkgs.mkShell (staticEnv // { packages = buildTools; });
+        devShells.ci = pkgs.mkShell (buildEnv // { packages = buildTools; });
 
         # Just the book. Separate from `.#ci` so the docs workflow does not pull a C toolchain it
         # never invokes, and separate from `.#default` so it does not pull gh and git-cliff.
         devShells.docs = pkgs.mkShell { packages = [ pkgs.mdbook ]; };
 
         # The CI toolchain plus what a person needs to release and to build the book.
-        devShells.default = pkgs.mkShell (staticEnv // {
+        devShells.default = pkgs.mkShell (buildEnv // {
           packages = buildTools ++ [
             pkgs.git-cliff
             pkgs.gh

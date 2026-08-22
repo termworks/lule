@@ -21,12 +21,9 @@ lule create -- set
 
 In order for lule to work properly, you need to set the following environment variables:
 - `LULE_W` : The path to the wallpaper (one random image will be selected from this directory)
-- `LULE_S` : The path to the script that will be run after the colors are generated
-(please check the 'scripts/apply_colors.sh' file for an example)
 
 ```
 export LULE_W="~/.wallpaper"
-export LULE_S="~/.func/lule_colors.sh"
 
 lule create -- set
 ```
@@ -45,12 +42,147 @@ v -prod -cflags -static src/ -o target/lule
 
 `oslo make` lists the rest — `dev`, `test`, `verify`, `install`, `docs`, `release`.
 
+## Templates that ship
+
+`templates/` holds one per *format*, not per application - a css file themes anything that reads
+css, an ini file anything that reads ini:
+
+```
+colors.sh  colors.css  colors.scss  colors.ini  colors.toml  colors.json  colors.Xresources
+```
+
+Point a template at wherever the program expects it:
+
+```lua
+lule.template("gtk", {
+  input  = "~/.config/lule/templates/colors.css",
+  output = "~/.config/gtk-4.0/colors.css",
+})
+```
+
+They use `ansi`, which is the sixteen terminal colours - `colors` is all 256:
+
+```
+<* for c in ansi *>--color{{ loop_index }}: {{ c.hex }};
+<* endfor *>
+```
+
+## Configuration
+
+Put `init.lua` in `~/.config/lule/` (or `$LULE_C/`). Settings are assigned, everything else is
+registered, and nothing is returned — the same shape oslo is configured in.
+`resources/init.example.lua` is a commented starting point.
+
+```lua
+local lule = require("lule")
+
+lule.theme    = "dark"
+lule.palette  = "pigment"
+lule.contrast = "aa"
+
+-- One list drives every path, which is what a config written in Lua buys you:
+-- adding an application is a word, not six lines.
+for _, app in ipairs({ "kitty", "waybar", "rofi" }) do
+  lule.template(app, {
+    input  = "~/.config/lule/templates/colors.ini",
+    output = "~/.config/" .. app .. "/colors.ini",
+  })
+end
+```
+
+Settings are `wallpaper`, `theme`, `palette`, `contrast`, `scheme`, `sort`, `saturation`,
+`illumination`, `hue`, `blend`, `seed`, `loop`, `norandom` and `cache` — the flags, by the same
+names. One the config never mentions is left alone.
+
+`lule.template(name, spec)` registers a template, keyed on its name: registering the same name
+again replaces it rather than adding a second. The order they are called in is the order they
+render in, and `lule.templates` is the list being registered into, so it can be assigned outright.
+
+Precedence runs **file, then environment, then flags** - a flag always wins. `~` is expanded by
+lule, since nothing in a config file passes through a shell. `--pattern` *adds to* what the file
+lists rather than replacing it.
+
+A broken config stops the run rather than falling back to defaults, and Lua names the file and
+line: `init.lua:12: syntax error near '='`. Carrying on would quietly apply a scheme you did not
+ask for, over the top of the one you had.
+
+### Doing things once the colours exist
+
+`lule.on.colors(fn)` registers a handler, called once the colours, the cache and the templates are
+all done. It is where a post-generation shell script would otherwise go — and it can be called as
+often as you like, so that script becomes several small functions rather than one big one.
+
+```lua
+local function write_cache(c)
+  lule.mkdir("~/.cache/wal")
+  lule.write("~/.cache/wal/colors", table.concat(c.colors, "\n"))
+end
+
+-- escape sequences down every open terminal: recolours a running shell in place
+local function recolour_terminals(c)
+  local esc = string.char(27)
+  local seq = esc .. "]11;" .. c.background .. esc .. "\\"
+  for i, hex in ipairs(c.ansi) do
+    seq = seq .. esc .. "]4;" .. (i - 1) .. ";" .. hex .. esc .. "\\"
+  end
+  lule.ttys(seq)
+end
+
+local function reload_desktop(c)
+  lule.run('hyprctl hyprpaper wallpaper ",' .. c.wallpaper .. ',"')
+  lule.spawn("zedtheme")
+end
+
+lule.on.colors(write_cache)
+lule.on.colors(recolour_terminals)
+lule.on.colors(reload_desktop)
+```
+
+Handlers run in the order they were registered, and one that raises is reported without stopping
+the ones after it. A handler is pure side effect — whatever it returns is ignored.
+
+`c` is the finished scheme: `c.colors` (all 256), `c.ansi` (the sixteen), `c.background`,
+`c.foreground`, `c.cursor`, `c.accent`, `c.wallpaper`, `c.theme`, `c.cache`. Lists count from one,
+so `c.colors[1]` is colour 0.
+
+| | |
+|---|---|
+| files | `lule.write(path, text)` `lule.append(path, text)` `lule.read(path)` `lule.copy(from, to)` `lule.mkdir(path)` |
+| commands | `lule.run(cmd)` returns its exit status; `lule.spawn(cmd)` does not wait |
+| terminals | `lule.ttys(text)` writes to every open pty, and answers how many |
+| environment | `lule.env(name)` |
+
+Paths take `~`. `lule.read` and `lule.env` answer `nil` when there is nothing there, so
+`lule.read(p) or "default"` reads the way it looks. A failing hook is reported and the run stands:
+the colours are already written by then, and throwing them away would be worse.
+
+### Splitting the config up
+
+A config can `require` the files beside it, so it does not have to be one file. The second file
+requires the module and registers more; it returns nothing, and nothing has to merge it.
+
+```lua
+-- ~/.config/lule/init.lua
+local lule = require("lule")
+lule.theme = "dark"
+require("terminals")
+
+-- ~/.config/lule/terminals.lua
+local lule = require("lule")
+lule.template("kitty", { input = "…", output = "…" })
+lule.on.colors(function(c) ... end)
+```
+
+`lule.template` is keyed on its name, so registering `kitty` again later replaces it rather than
+rendering twice — that is how a required file's template gets overridden. The replacement keeps the
+position the original had, so overriding one does not reshuffle the others. `lule.on.colors`
+accumulates instead: handlers for one event are meant to add up.
+
 ## Environment
 
 | variable | what |
 |---|---|
 | `LULE_W` | directory to pick a wallpaper from at random |
-| `LULE_S` | script to run once the colors are generated |
 | `LULE_C` | directory holding named color schemes |
 | `LULE_A` | directory to write the color cache into |
 | `LULE_STDIN_MS` | how long to wait for a piped scheme (default 250ms) |
@@ -70,6 +202,23 @@ lule create --sort=hue -- set            # choose the accent by hue rather than 
 ```
 
 `--sort` takes `dominance` (default), `hue`, `light`, `dark` or `chroma`.
+
+### Readability
+
+The sixteen ANSI colours are held to a minimum WCAG contrast against the background, so no slot
+comes out too dim to read. Measured before this existed, 3 to 5 of the 15 fell below AA on real
+wallpapers.
+
+```
+lule create -- set                       # AA (4.5:1), the default
+lule create --contrast=aaa -- set        # 7:1
+lule create --contrast=3.0 -- set        # a ratio of your own
+lule create --contrast=none -- set       # off, colours exactly as extracted
+```
+
+Only lightness moves, and only as far as it has to, so hues survive. Colour 0 is the background
+everything is measured against and the ramps past 15 are gradients rather than text, so both are
+left alone.
 
 ### Reproducible schemes
 
@@ -118,15 +267,6 @@ lule daemon -- stop
 
 Only one daemon runs at a time; a second refuses to start rather than fighting the first over the
 control pipe.
-
-## Running nothing
-
-`lule create -- set` runs whatever `$LULE_S` names, and that list is remembered in the cached
-scheme — so clearing the variable does not stop it. `--no-scripts` (or `-n`) does:
-
-```
-lule create -n --image=~/wall.png -- set
-```
 
 ## Templates
 

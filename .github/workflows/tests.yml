@@ -59,15 +59,21 @@ jobs:
             file target/lule'
 
       - name: V tests
-        run: nix develop .#ci --command v test src/
+        run: |
+          set -euo pipefail
+          # Every directory holding a test, discovered rather than listed. `v test src/` does not
+          # recurse into the module directories under it, so a newly extracted module's tests
+          # would silently stop running while this step went on reporting green.
+          dirs="$(find src -name '*_test.v' -printf '%h\n' | sort -u | tr '\n' ' ')"
+          [ -n "$dirs" ] || { echo "::error::no test files found"; exit 1; }
+          echo "testing: $dirs"
+          nix develop .#ci --command v test $dirs
 
       - name: Smoke test
         run: |
           set -euo pipefail
           cache="$(mktemp -d)"
-          # LULE_S names the caller's real colour-applying script. A runner has none, but an
-          # empty value is the explicit statement that none should run.
-          export LULE_A="$cache" LULE_S=""
+          export LULE_A="$cache"
           ./target/lule --version
           ./target/lule create --image=resources/theme_dark.png -- set
           count="$(grep -c . "$cache/colors")"

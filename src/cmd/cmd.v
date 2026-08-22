@@ -1,8 +1,11 @@
-module main
+module cmd
 
+// Named `cmd` rather than `cli` on purpose: vlib ships its own `cli` module, so `import cli` in
+// this project silently resolved to that one instead. Every reference then failed with
+// "unknown function", while the file on disk looked perfectly correct.
 import os
 
-pub const version = '0.5.1'
+pub const version = '0.5.2'
 pub const description = "a command line to set 255 colors on tty's and other places that use ANSI colors"
 
 pub struct Args {
@@ -14,12 +17,14 @@ pub mut:
 	present    map[string]bool
 }
 
-const subcommands = ['create', 'daemon', 'colors', 'config', 'test']
+pub const subcommands = ['create', 'daemon', 'colors', 'config', 'test']
 
-const multi_flags = ['pattern', 'script']
+pub const multi_flags = ['pattern']
 
 // The palette extractors that exist. `--palette` used to accept anything.
-pub const known_palettes = ['pigment']
+pub fn known_palettes() []string {
+	return ['pigment', 'median', 'histogram', 'tonal']
+}
 
 // clap's InferSubcommands: accept any unambiguous prefix
 fn resolve_subcommand(name string) string {
@@ -120,8 +125,6 @@ pub fn print_help(logo string) {
 	println('        --configs=<PATH>       specify a dir to load color configs from')
 	println('        --cache=<PATH>         specify a dir where to dump color caches')
 	println('        --pattern=<PATH:PATH>  specify a path to substitute pattern colors')
-	println('        --script=<PATH>        specify a script to run after colors are generated')
-	println('    -n, --no-scripts           generate colors but run no scripts at all')
 	println('    -h, --help                 Prints help information')
 	println('    -V, --version              Prints version information')
 	println('')
@@ -129,7 +132,7 @@ pub fn print_help(logo string) {
 	println('    create    Generate new colors from an image')
 	println('                --wallpath=<DIRPATH>  folder to pick an image randomly')
 	println('                --image=<FILEPATH>    image to extract colors from')
-	println('                --palette=<NAME>      pigment (default)')
+	println('                --palette=<NAME>      pigment (default) | median | histogram | tonal')
 	println('                --scheme=<NAME>       color scheme from configs')
 	println('                --theme=<THEME>       dark (default) | light')
 	println('                --sort=<MODE>         dominance (default) | hue | light | dark | chroma')
@@ -138,6 +141,7 @@ pub fn print_help(logo string) {
 	println('                --hue=<DEGREES>       rotate every pigment round the wheel')
 	println('                --blend=<N>           0 unchanged .. 1.0 all one hue')
 	println('                --seed=<N>            same wallpaper, same scheme, every time')
+	println('                --contrast=<N>        aa (default) | aaa | none | a ratio such as 3.0')
 	println('                --norandom            fixed RGB ramps instead of random ones')
 	println('                -- <set|regen>')
 	println('    daemon    Run as daemon process with looping wallpapers')

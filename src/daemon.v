@@ -1,7 +1,11 @@
 module main
 
+import config
+import paths
+import ui
 import os
 import time
+import cmd
 
 fn C.mkfifo(path &char, mode u32) int
 
@@ -72,23 +76,23 @@ fn detach() ! {
 	if second > 0 {
 		exit(0)
 	}
-	write_to_file(temp_path('lule.pid'), '${os.getpid()}')
+	paths.write_to_file(paths.temp_path('lule.pid'), '${os.getpid()}')
 	os.chdir('/tmp') or {}
 }
 
-fn daemoned(mut scheme Scheme) {
+fn daemoned(mut scheme config.Scheme, mut hooks config.Hooks) {
 	// Two daemons share one fifo, so each message goes to whichever happens to be reading and the
 	// wallpaper timers fight each other. Refusing the second is the only sane outcome.
 	if other := running_daemon_other_than(os.getpid()) {
-		eprintln('${red_bold('error:')} a lule daemon is already running (pid ${other})')
-		eprintln('${red_bold('error:')} stop it with ${yellow('lule daemon -- stop')}')
+		eprintln('${ui.red_bold('error:')} a lule daemon is already running (pid ${other})')
+		eprintln('${ui.red_bold('error:')} stop it with ${ui.yellow('lule daemon -- stop')}')
 		exit(1)
 	}
 	// `detach` writes this before forking; `start` stays in the foreground and would otherwise
 	// leave `daemon -- stop` with nothing to find.
-	write_to_file(temp_path('lule.pid'), '${os.getpid()}')
+	paths.write_to_file(paths.temp_path('lule.pid'), '${os.getpid()}')
 
-	pipe_name := temp_path('lule_pipe')
+	pipe_name := paths.temp_path('lule_pipe')
 	if os.is_file(pipe_name) {
 		os.rm(pipe_name) or {}
 	}
@@ -99,9 +103,9 @@ fn daemoned(mut scheme Scheme) {
 	spawn read_pipe(pipe_name, pipe_ch)
 	spawn time_to_sleep(scheme.looop, time_ch)
 
-	write_colors(mut scheme, false)
+	write_colors(mut scheme, false, mut hooks)
 
-	tty := is_tty_stdout()
+	tty := ui.is_tty_stdout()
 	for {
 		if tty {
 			println(scheme.to_json())
@@ -115,15 +119,15 @@ fn daemoned(mut scheme Scheme) {
 						exit(0)
 					} else if trimmed == 'next' {
 						scheme.image = ''
-						write_colors(mut scheme, false)
+						write_colors(mut scheme, false, mut hooks)
 						handled = true
 					} else {
-						if sh := scheme_from_json(trimmed) {
+						if sh := config.scheme_from_json(trimmed) {
 							scheme.modi(sh)
 							if tty {
 								println(scheme.theme)
 							}
-							write_colors(mut scheme, false)
+							write_colors(mut scheme, false, mut hooks)
 							handled = true
 						} else {
 							if tty {
@@ -134,7 +138,7 @@ fn daemoned(mut scheme Scheme) {
 				}
 				_ := <-time_ch {
 					scheme.image = ''
-					write_colors(mut scheme, false)
+					write_colors(mut scheme, false, mut hooks)
 					handled = true
 				}
 			}
@@ -148,7 +152,7 @@ fn daemoned(mut scheme Scheme) {
 // The pid of a running daemon, or 0. A pidfile alone is not evidence: a killed daemon leaves one
 // behind, and the pid may since have been handed to something else.
 fn running_daemon() int {
-	pid := (file_to_string(temp_path('lule.pid')) or { return 0 }).trim_space().int()
+	pid := (paths.file_to_string(paths.temp_path('lule.pid')) or { return 0 }).trim_space().int()
 	if pid <= 0 || !os.exists('/proc/${pid}') {
 		return 0
 	}
@@ -169,24 +173,24 @@ fn running_daemon_other_than(self int) ?int {
 // it. Checking for the process first turns that into a one-line error.
 fn send_to_daemon(message string) {
 	if running_daemon() == 0 {
-		eprintln('${red_bold('error:')} no lule daemon is running')
-		eprintln('${red_bold('error:')} start one with ${yellow('lule daemon -- detach')}')
+		eprintln('${ui.red_bold('error:')} no lule daemon is running')
+		eprintln('${ui.red_bold('error:')} start one with ${ui.yellow('lule daemon -- detach')}')
 		exit(1)
 	}
-	write_to_file(temp_path('lule_pipe'), message)
+	paths.write_to_file(paths.temp_path('lule_pipe'), message)
 }
 
-pub fn run_daemon(a &Args, mut scheme Scheme) {
+pub fn run_daemon(a &cmd.Args, mut scheme config.Scheme, mut hooks config.Hooks) {
 	match a.action {
 		'start' {
-			daemoned(mut scheme)
+			daemoned(mut scheme, mut hooks)
 		}
 		'detach' {
 			detach() or {
-				eprintln('${red_bold('error:')} ${err}')
+				eprintln('${ui.red_bold('error:')} ${err}')
 				exit(1)
 			}
-			daemoned(mut scheme)
+			daemoned(mut scheme, mut hooks)
 		}
 		'next' {
 			send_to_daemon('next')
@@ -203,7 +207,7 @@ pub fn run_daemon(a &Args, mut scheme Scheme) {
 			println('lule daemon: running (pid ${pid})')
 		}
 		else {
-			eprintln('${red_bold('error:')} daemon action must be one of start|stop|next|detach|status')
+			eprintln('${ui.red_bold('error:')} daemon action must be one of start|stop|next|detach|status')
 			exit(1)
 		}
 	}

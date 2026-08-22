@@ -1,5 +1,6 @@
-module main
+module config
 
+import color
 import json
 
 pub struct Pattern {
@@ -10,7 +11,7 @@ pub mut:
 
 pub struct Scheme {
 pub mut:
-	colors       []Color @[skip]
+	colors       []color.Color @[skip]
 	image        string
 	theme        string
 	pigments     []string
@@ -18,7 +19,6 @@ pub mut:
 	walldir      string
 	config       string @[skip]
 	cache        string @[skip]
-	scripts      []string
 	patterns     []Pattern
 	looop        int
 	palette      string
@@ -27,6 +27,7 @@ pub mut:
 	illumination f64
 	hue          f64
 	seed         int
+	contrast     f64
 	blend        f64
 	norandom     bool
 }
@@ -58,9 +59,6 @@ pub fn (mut s Scheme) modi(new Scheme) {
 	if new.cache != '' {
 		s.cache = new.cache
 	}
-	if new.scripts.len > 0 {
-		s.scripts = new.scripts.clone()
-	}
 	if new.patterns.len > 0 {
 		s.patterns = new.patterns.clone()
 	}
@@ -84,6 +82,9 @@ pub fn (mut s Scheme) modi(new Scheme) {
 	}
 	if new.seed != 0 {
 		s.seed = new.seed
+	}
+	if new.contrast != 0.0 {
+		s.contrast = new.contrast
 	}
 	if new.blend != 0.0 {
 		s.blend = new.blend
