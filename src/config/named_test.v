@@ -1,6 +1,7 @@
 module config
 
 import os
+import cmd
 
 fn write_scheme_file(dir string, name string, body string) string {
 	path := os.join_path(dir, name)
@@ -51,4 +52,19 @@ fn test_named_scheme_finds_suffixed_files() {
 	}
 	write_scheme_file(tmp, 'nord.txt', '#2e3440\n#88c0d0\n')
 	assert named_scheme(tmp, 'nord') == ['#2e3440', '#88c0d0']
+}
+
+// Being pointed somewhere that holds no config is worth saying out loud; the default location
+// being empty is the ordinary case and stays quiet.
+fn test_an_explicit_config_dir_with_no_init_lua_is_located_anyway() {
+	dir := os.join_path(os.temp_dir(), 'lule_noconfig_${os.getpid()}')
+	os.rmdir_all(dir) or {}
+	os.mkdir_all(dir) or { panic(err) }
+	defer {
+		os.rmdir_all(dir) or {}
+	}
+	mut scheme := Scheme{}
+	locate_config(cmd.parse_args(['create', '--configs=${dir}', '--', 'set']), mut scheme)
+	assert scheme.config == dir
+	assert !os.is_file(config_path(dir))
 }

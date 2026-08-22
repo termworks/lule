@@ -183,7 +183,7 @@ accumulates instead: handlers for one event are meant to add up.
 | variable | what |
 |---|---|
 | `LULE_W` | directory to pick a wallpaper from at random |
-| `LULE_C` | directory holding named color schemes |
+| `LULE_C` | config directory: `init.lua` and the named color schemes |
 | `LULE_A` | directory to write the color cache into |
 | `LULE_STDIN_MS` | how long to wait for a piped scheme (default 250ms) |
 
