@@ -1,5 +1,7 @@
 module main
 
+import paths
+import ui
 import os
 import cmd
 
@@ -7,7 +9,7 @@ import cmd
 
 fn defs_concatinate(mut scheme Scheme) {
 	config_dir := os.config_dir() or {
-		eprintln('${red_bold('error:')} Path for configs is impossible to get')
+		eprintln('${ui.red_bold('error:')} Path for configs is impossible to get')
 		exit(1)
 	}
 	cache_dir := os.cache_dir()
@@ -38,7 +40,7 @@ fn envi_concatinate(mut scheme Scheme) {
 }
 
 fn temp_concatinate(mut scheme Scheme) {
-	if content := file_to_string(temp_path('lule_scheme')) {
+	if content := paths.file_to_string(paths.temp_path('lule_scheme')) {
 		if sh := scheme_from_json(content) {
 			config := scheme.config
 			cache := scheme.cache
@@ -105,7 +107,7 @@ fn args_concatinate(a &cmd.Args, mut scheme Scheme) {
 			if parts.len == 2 {
 				patterns << Pattern{parts[0], parts[1]}
 			} else {
-				eprintln('${yellow('warning:')} --pattern=${val} is not IN:OUT')
+				eprintln('${ui.yellow('warning:')} --pattern=${val} is not IN:OUT')
 			}
 		}
 		scheme.patterns = patterns
@@ -134,8 +136,8 @@ fn args_concatinate(a &cmd.Args, mut scheme Scheme) {
 				// scheme was built from whatever happened to be cached already.
 				known := cmd.known_palettes()
 				if v !in known {
-					eprintln('${red_bold('error:')} unknown palette ${yellow(v)}')
-					eprintln('${red_bold('error:')} known palettes: ${known.join(', ')}')
+					eprintln('${ui.red_bold('error:')} unknown palette ${ui.yellow(v)}')
+					eprintln('${ui.red_bold('error:')} known palettes: ${known.join(', ')}')
 					exit(1)
 				}
 				scheme.palette = v
@@ -201,7 +203,7 @@ fn stdin_ready(timeout_ms int) bool {
 //
 // $LULE_STDIN_MS overrides the deadline for a slow producer.
 fn pipe_concatinate(mut scheme Scheme) {
-	if is_tty_stdin() {
+	if ui.is_tty_stdin() {
 		return
 	}
 	mut budget := 250
@@ -273,10 +275,10 @@ pub fn concatinate(a &cmd.Args, mut scheme Scheme, needs_image bool) {
 	}
 
 	if needs_image && scheme.image == '' && scheme.walldir == '' {
-		eprintln('${red_bold('error:')} Environment variable ${yellow("'\$LULE_W'")} is empty')
-		eprintln('${red_bold('error:')} Argument option ${yellow("'--wallpath'")} is not set')
-		eprintln('${red_bold('error:')} Image argument ${yellow("'--image'")} is not given')
-		eprintln('\n${yellow('USAGE')}\n\tlule help <subcommands>...\n\nFor more information try ${blue('--help')}')
+		eprintln('${ui.red_bold('error:')} Environment variable ${ui.yellow("'\$LULE_W'")} is empty')
+		eprintln('${ui.red_bold('error:')} Argument option ${ui.yellow("'--wallpath'")} is not set')
+		eprintln('${ui.red_bold('error:')} Image argument ${ui.yellow("'--image'")} is not given')
+		eprintln('\n${ui.yellow('USAGE')}\n\tlule help <subcommands>...\n\nFor more information try ${ui.blue('--help')}')
 		exit(1)
 	}
 }

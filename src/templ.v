@@ -1,16 +1,18 @@
 module main
 
+import paths
+import ui
 import os
 import color
 import template
 
 pub fn generate_template(original string, replaced string, scheme &Scheme) ! {
-	content := file_to_string(original)!
+	content := paths.file_to_string(original)!
 	rendered, problems := template.render_in(content, template_context(scheme), os.dir(original))
 	for problem in problems {
-		eprintln('${yellow('warning:')} ${original}: ${problem}')
+		eprintln('${ui.yellow('warning:')} ${original}: ${problem}')
 	}
-	write_to_file(replaced, rendered)
+	paths.write_to_file(replaced, rendered)
 }
 
 pub fn pattern_generation(scheme &Scheme) {

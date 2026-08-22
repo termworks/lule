@@ -1,5 +1,7 @@
 module main
 
+import paths
+import ui
 import os
 import cmd
 
@@ -10,11 +12,11 @@ pub fn write_colors(mut scheme Scheme, old bool) {
 	seed_rand(scheme.seed)
 	if old {
 		if scheme.cache != '' {
-			scheme.pigments = lines_to_vec(os.join_path(scheme.cache, 'palette'))
-			if content := file_to_string(os.join_path(scheme.cache, 'wallpaper')) {
+			scheme.pigments = paths.lines_to_vec(os.join_path(scheme.cache, 'palette'))
+			if content := paths.file_to_string(os.join_path(scheme.cache, 'wallpaper')) {
 				scheme.image = content
 			}
-			if content := file_to_string(os.join_path(scheme.cache, 'theme')) {
+			if content := paths.file_to_string(os.join_path(scheme.cache, 'theme')) {
 				scheme.theme = content
 			}
 		}
@@ -22,8 +24,8 @@ pub fn write_colors(mut scheme Scheme, old bool) {
 		// palette padding in gen_main_six invents grey when it is handed no pigments, so the
 		// command reported success and wrote a grey scheme over the caller's colours.
 		if scheme.pigments.len == 0 {
-			eprintln('${red_bold('error:')} nothing cached to regenerate from')
-			eprintln('${red_bold('error:')} run ${yellow('lule create -- set')} first')
+			eprintln('${ui.red_bold('error:')} nothing cached to regenerate from')
+			eprintln('${ui.red_bold('error:')} run ${ui.yellow('lule create -- set')} first')
 			exit(1)
 		}
 	} else if scheme.scheme != '' {
@@ -34,7 +36,7 @@ pub fn write_colors(mut scheme Scheme, old bool) {
 		if scheme.image == '' && scheme.walldir != '' {
 			scheme.image = random_image(scheme.walldir)
 		}
-		write_temp_file('lule_palette', scheme.pigments.join('\n'))
+		paths.write_temp_file('lule_palette', scheme.pigments.join('\n'))
 	} else {
 		if scheme.image == '' {
 			scheme.image = random_image(scheme.walldir)
@@ -42,7 +44,7 @@ pub fn write_colors(mut scheme Scheme, old bool) {
 		known := cmd.known_palettes()
 		if scheme.palette in known {
 			palette := palette_from_image(scheme.image, scheme.palette)
-			write_temp_file('lule_palette', palette.join('\n'))
+			paths.write_temp_file('lule_palette', palette.join('\n'))
 			scheme.pigments = palette
 		}
 	}

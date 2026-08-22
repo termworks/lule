@@ -1,5 +1,6 @@
 module main
 
+import ui
 import os
 import luavm
 
@@ -56,7 +57,7 @@ pub fn config_lua_concatinate(mut scheme Scheme) {
 		return
 	}
 	source := os.read_file(path) or {
-		eprintln('${red_bold('error:')} cannot read ${yellow(path)}: ${err}')
+		eprintln('${ui.red_bold('error:')} cannot read ${ui.yellow(path)}: ${err}')
 		exit(1)
 	}
 
@@ -68,7 +69,7 @@ pub fn config_lua_concatinate(mut scheme Scheme) {
 	// The module is defined before the config runs, so `require("lule")` finds it already loaded
 	// and never touches the filesystem looking for a lule.lua.
 	vm.run(lule_module, 'lule module') or {
-		eprintln('${red_bold('error:')} ${err}')
+		eprintln('${ui.red_bold('error:')} ${err}')
 		exit(1)
 	}
 	vm.pop(1)
@@ -76,12 +77,12 @@ pub fn config_lua_concatinate(mut scheme Scheme) {
 	vm.run(source, path) or {
 		// A broken config is worth stopping for. Carrying on with defaults would silently apply a
 		// scheme the user did not ask for, over the top of the one they had.
-		eprintln('${red_bold('error:')} ${err}')
+		eprintln('${ui.red_bold('error:')} ${err}')
 		exit(1)
 	}
 
 	if !vm.top_is_table() {
-		eprintln('${yellow('warning:')} ${path} returned nothing; did you forget `return lule.setup({...})`?')
+		eprintln('${ui.yellow('warning:')} ${path} returned nothing; did you forget `return lule.setup({...})`?')
 		return
 	}
 
@@ -163,12 +164,12 @@ fn read_lua_templates(mut vm luavm.State, mut scheme Scheme, from string) {
 		if vm.top_is_table() {
 			name := lua_text(mut vm, 'name') or { '#${i}' }
 			input := lua_text(mut vm, 'input') or {
-				eprintln('${yellow('warning:')} ${from}: template ${name} has no input')
+				eprintln('${ui.yellow('warning:')} ${from}: template ${name} has no input')
 				vm.pop(1)
 				continue
 			}
 			output := lua_text(mut vm, 'output') or {
-				eprintln('${yellow('warning:')} ${from}: template ${name} has no output')
+				eprintln('${ui.yellow('warning:')} ${from}: template ${name} has no output')
 				vm.pop(1)
 				continue
 			}

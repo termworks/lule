@@ -1,5 +1,7 @@
 module main
 
+import paths
+import ui
 import color
 import os
 import cmd
@@ -26,20 +28,20 @@ fn cmd_colors(a &cmd.Args, mut scheme Scheme) {
 		if cached.len > 0 {
 			scheme.colors = cached
 		}
-		if content := file_to_string(os.join_path(scheme.cache, 'wallpaper')) {
+		if content := paths.file_to_string(os.join_path(scheme.cache, 'wallpaper')) {
 			scheme.image = content
 		}
-		if content := file_to_string(os.join_path(scheme.cache, 'theme')) {
+		if content := paths.file_to_string(os.join_path(scheme.cache, 'theme')) {
 			scheme.theme = content
 		}
 	}
 
 	if scheme.colors.len == 0 {
-		eprintln('${red_bold('error:')} no colors cached yet - run ${yellow('lule create -- set')} first')
+		eprintln('${ui.red_bold('error:')} no colors cached yet - run ${ui.yellow('lule create -- set')} first')
 		exit(1)
 	}
 
-	cols, rows := term_size()
+	cols, rows := ui.term_size()
 	action := if a.action == '' { 'ansii' } else { a.action }
 
 	// Ahead of the tty check, because being piped is exactly when json is asked for. Everything
@@ -49,7 +51,7 @@ fn cmd_colors(a &cmd.Args, mut scheme Scheme) {
 		return
 	}
 
-	if !is_tty_stdout() {
+	if !ui.is_tty_stdout() {
 		for swatch in scheme.colors {
 			println(swatch.to_hex(true))
 		}
@@ -87,10 +89,10 @@ fn pad_for(cols int) int {
 fn cmd_config(a &cmd.Args, mut scheme Scheme) {
 	concatinate(a, mut scheme, false)
 	payload := scheme.to_json()
-	if !is_tty_stdout() {
+	if !ui.is_tty_stdout() {
 		println(payload)
 	} else {
-		write_to_file(temp_path('lule_pipe'), payload)
+		paths.write_to_file(paths.temp_path('lule_pipe'), payload)
 	}
 }
 
@@ -102,7 +104,7 @@ fn cmd_test(a &cmd.Args, mut scheme Scheme) {
 
 	if scheme.image == '' {
 		if scheme.walldir == '' {
-			eprintln('${red_bold('error:')} no image or wallpath given')
+			eprintln('${ui.red_bold('error:')} no image or wallpath given')
 			exit(1)
 		}
 		scheme.image = random_image(scheme.walldir)
@@ -112,7 +114,7 @@ fn cmd_test(a &cmd.Args, mut scheme Scheme) {
 	scheme.pigments = palette
 	scheme.colors = get_all_colors(mut scheme)
 
-	cols, rows := term_size()
+	cols, rows := ui.term_size()
 	display_image(scheme.image, cols - 10, rows - 13) or {}
 	println('Palette')
 	mut colors := []color.Color{}

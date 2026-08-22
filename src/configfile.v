@@ -1,5 +1,6 @@
 module main
 
+import ui
 import os
 import toml
 import cmd
@@ -34,8 +35,8 @@ pub fn config_concatinate(mut scheme Scheme) {
 		return
 	}
 	doc := toml.parse_file(path) or {
-		eprintln('${red_bold('error:')} ${yellow(path)} is not valid toml')
-		eprintln('${red_bold('error:')} ${err}')
+		eprintln('${ui.red_bold('error:')} ${ui.yellow(path)} is not valid toml')
+		eprintln('${ui.red_bold('error:')} ${err}')
 		exit(1)
 	}
 
@@ -115,11 +116,11 @@ fn apply_templates(templates toml.Any, mut scheme Scheme, from string) {
 	for name in names {
 		table := tables[name] or { continue }
 		input := as_text(table.value('input')) or {
-			eprintln('${yellow('warning:')} ${from}: template `${name}` has no input')
+			eprintln('${ui.yellow('warning:')} ${from}: template `${name}` has no input')
 			continue
 		}
 		output := as_text(table.value('output')) or {
-			eprintln('${yellow('warning:')} ${from}: template `${name}` has no output')
+			eprintln('${ui.yellow('warning:')} ${from}: template `${name}` has no output')
 			continue
 		}
 		patterns << Pattern{expand_home(input), expand_home(output)}

@@ -1,5 +1,6 @@
 module main
 
+import paths
 import os
 import json
 
@@ -9,15 +10,15 @@ pub fn write_temp(scheme &Scheme) {
 		for swatch in scheme.colors {
 			record << swatch.to_hex(true)
 		}
-		write_temp_file('lule_colors', record.join('\n'))
+		paths.write_temp_file('lule_colors', record.join('\n'))
 	}
 	if scheme.image != '' {
-		write_temp_file('lule_wallpaper', scheme.image)
+		paths.write_temp_file('lule_wallpaper', scheme.image)
 	}
 	if scheme.theme != '' {
-		write_temp_file('lule_theme', scheme.theme)
+		paths.write_temp_file('lule_theme', scheme.theme)
 	}
-	write_temp_file('lule_scheme', scheme.to_json())
+	paths.write_temp_file('lule_scheme', scheme.to_json())
 }
 
 // Written from the scheme rather than copied out of /tmp.
@@ -38,16 +39,16 @@ pub fn write_cache(scheme &Scheme) {
 		for swatch in scheme.colors {
 			record << swatch.to_hex(true)
 		}
-		write_to_file(os.join_path(scheme.cache, 'colors'), record.join('\n'))
+		paths.write_to_file(os.join_path(scheme.cache, 'colors'), record.join('\n'))
 	}
 	if scheme.pigments.len > 0 {
-		write_to_file(os.join_path(scheme.cache, 'palette'), scheme.pigments.join('\n'))
+		paths.write_to_file(os.join_path(scheme.cache, 'palette'), scheme.pigments.join('\n'))
 	}
 	if scheme.image != '' {
-		write_to_file(os.join_path(scheme.cache, 'wallpaper'), scheme.image)
+		paths.write_to_file(os.join_path(scheme.cache, 'wallpaper'), scheme.image)
 	}
 	if scheme.theme != '' {
-		write_to_file(os.join_path(scheme.cache, 'theme'), scheme.theme)
+		paths.write_to_file(os.join_path(scheme.cache, 'theme'), scheme.theme)
 	}
 }
 
@@ -56,7 +57,7 @@ pub fn write_cache_json(scheme &Scheme, payload string) {
 		return
 	}
 	os.mkdir_all(scheme.cache) or {}
-	write_to_file(os.join_path(scheme.cache, 'colors.json'), payload)
+	paths.write_to_file(os.join_path(scheme.cache, 'colors.json'), payload)
 }
 
 pub fn output_to_json(scheme &Scheme, as_map bool) string {

@@ -1,12 +1,14 @@
 module main
 
+import paths
+import ui
 import color
 import os
 import palette
 
 pub fn palette_from_image(image string, backend string) []string {
 	colors_lab := palette.pigments(image, 16, 300, backend) or {
-		eprintln('${red_bold('error:')} Problem creating palette -> ${err}')
+		eprintln('${ui.red_bold('error:')} Problem creating palette -> ${err}')
 		exit(1)
 	}
 	mut colors := []string{}
@@ -19,7 +21,7 @@ pub fn palette_from_image(image string, backend string) []string {
 
 pub fn colors_from_file(path string) []color.Color {
 	mut colors := []color.Color{}
-	for line in lines_to_vec(path) {
+	for line in paths.lines_to_vec(path) {
 		colors << color.color_from_hex(line)
 	}
 	return colors
@@ -30,7 +32,7 @@ pub fn colors_from_file(path string) []color.Color {
 // before, both were parsed, stored and never read.
 pub fn named_scheme(config_dir string, name string) []string {
 	if config_dir == '' {
-		eprintln('${red_bold('error:')} no configs directory; set ${yellow('$LULE_C')} or pass ${yellow('--configs')}')
+		eprintln('${ui.red_bold('error:')} no configs directory; set ${ui.yellow('$LULE_C')} or pass ${ui.yellow('--configs')}')
 		exit(1)
 	}
 	mut tried := []string{}
@@ -41,7 +43,7 @@ pub fn named_scheme(config_dir string, name string) []string {
 			continue
 		}
 		mut colors := []string{}
-		for line in lines_to_vec(path) {
+		for line in paths.lines_to_vec(path) {
 			// The whole token has to be a colour, not merely start like one — otherwise a
 			// comment such as `# abc are the accents` parses as #aabbcc and joins the palette.
 			token := line.trim_space().trim_string_left('#')
@@ -54,14 +56,14 @@ pub fn named_scheme(config_dir string, name string) []string {
 			colors << color.color_from_hex(token).to_hex(true)
 		}
 		if colors.len == 0 {
-			eprintln('${red_bold('error:')} ${yellow(path)} holds no hex colours')
+			eprintln('${ui.red_bold('error:')} ${ui.yellow(path)} holds no hex colours')
 			exit(1)
 		}
 		return colors
 	}
-	eprintln('${red_bold('error:')} no scheme named ${yellow(name)}')
+	eprintln('${ui.red_bold('error:')} no scheme named ${ui.yellow(name)}')
 	for path in tried {
-		eprintln('${red_bold('error:')}   looked in ${path}')
+		eprintln('${ui.red_bold('error:')}   looked in ${path}')
 	}
 	exit(1)
 }
