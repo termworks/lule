@@ -55,7 +55,7 @@
 
           meta = {
             description = "Wallpaper palette generator";
-            homepage = "https://github.com/warpwm/lule";
+            homepage = "https://github.com/termworks/lule";
             license = pkgs.lib.licenses.mit;
             mainProgram = "lule";
             platforms = pkgs.lib.platforms.linux;
