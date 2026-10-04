@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: nix-cache-${{ github.ref }}
+  group: nix-cache
   cancel-in-progress: false
 
 jobs:
@@ -52,7 +52,7 @@ jobs:
         run: |
           cachix push termworks < "$RUNNER_TEMP/lule-store-paths"
           path=$(cat "$RUNNER_TEMP/lule-store-paths")
-          cachix pin termworks "lule-$GITHUB_REF_NAME-$SYSTEM" "$path"
+          cachix pin termworks "lule-latest-$SYSTEM" "$path" --keep-revisions 1
 
   verify-download:
     needs: publish
