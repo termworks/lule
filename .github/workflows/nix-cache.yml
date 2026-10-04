@@ -52,7 +52,7 @@ jobs:
         run: |
           cachix push termworks < "$RUNNER_TEMP/lule-store-paths"
           path=$(cat "$RUNNER_TEMP/lule-store-paths")
-          cachix pin termworks "lule-latest-$SYSTEM" "$path" --keep-revisions 1
+          cachix pin termworks "lule-$SYSTEM" "$path" --keep-revisions 5
 
   verify-download:
     needs: publish
