@@ -42,6 +42,26 @@ v -prod -cflags -static src/ -o target/lule
 
 `oslo make` lists the rest — `dev`, `test`, `verify`, `install`, `docs`, `release`.
 
+### Nix binary cache
+
+Tagged releases are cached for `x86_64-linux` and `aarch64-linux`:
+
+```sh
+cachix use termworks
+nix build --accept-flake-config github:warpwm/lule/v0.5.4
+nix run --accept-flake-config github:warpwm/lule/v0.5.4 -- --version
+```
+
+The cache is `https://termworks.cachix.org`, with public signing key
+`termworks.cachix.org-1:Ty7sSVALfD5ajbcWBIdaNHcaEx3fEmVrOo+rSzy0mvE=`.
+Only pushed `v*` tags publish to the cache; branch revisions may need compilation.
+Use `oslo make nix-build` and `oslo make nix-check` for local package checks.
+
+From another flake, set `inputs.lule.url = "github:warpwm/lule/v0.5.4"` and
+use `lule.packages.${system}.default`. Enable the cache on the consuming machine
+with `cachix use termworks`; input flakes do not apply their `nixConfig`
+automatically.
+
 ## Templates that ship
 
 `templates/` holds one per *format*, not per application - a css file themes anything that reads

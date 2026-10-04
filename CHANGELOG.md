@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.4] - 2026-10-04
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Package lule and cache tagged releases
+
 ## [0.5.3] - 2026-08-22
 
 ### <!-- 1 -->🐛 Bug Fixes

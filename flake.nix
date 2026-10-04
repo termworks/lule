@@ -1,5 +1,10 @@
 {
-  description = "lule V development shell";
+  description = "lule wallpaper palette generator";
+
+  nixConfig = {
+    extra-substituters = [ "https://termworks.cachix.org" ];
+    extra-trusted-public-keys = [ "termworks.cachix.org-1:Ty7sSVALfD5ajbcWBIdaNHcaEx3fEmVrOo+rSzy0mvE=" ];
+  };
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -8,10 +13,54 @@
 
   outputs =
     { nixpkgs, flake-utils, ... }:
-    flake-utils.lib.eachDefaultSystem (
+    flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       system:
       let
         pkgs = import nixpkgs { inherit system; };
+
+        lule = pkgs.stdenv.mkDerivation (finalAttrs: {
+          pname = "lule";
+          version = builtins.head (builtins.match ".*version:[[:space:]]*'([^']+)'.*" (builtins.readFile ./v.mod));
+          src = pkgs.lib.cleanSource ./.;
+          nativeBuildInputs = [ pkgs.vlang pkgs.pkg-config ];
+          buildInputs = [ pkgs.lua5_4 ];
+
+          buildPhase = ''
+            runHook preBuild
+            export HOME=$TMPDIR
+            mkdir -p target
+            v -prod -cflags "-static -L${pkgs.glibc.static}/lib" src/ -o target/lule
+            runHook postBuild
+          '';
+
+          installPhase = ''
+            runHook preInstall
+            install -Dm755 target/lule $out/bin/lule
+            runHook postInstall
+          '';
+
+          doInstallCheck = true;
+          installCheckPhase = ''
+            runHook preInstallCheck
+            test "$($out/bin/lule --version)" = 'lule ${finalAttrs.version}'
+            if readelf -l $out/bin/lule | grep -q INTERP; then exit 1; fi
+            if readelf -d $out/bin/lule | grep -q NEEDED; then exit 1; fi
+            export LULE_A=$TMPDIR/lule-cache
+            mkdir -p "$LULE_A"
+            $out/bin/lule create --image=resources/theme_dark.png -- set
+            test "$(grep -c . "$LULE_A/colors")" = 256
+            grep -qE '^#[0-9a-f]{6}$' "$LULE_A/colors"
+            runHook postInstallCheck
+          '';
+
+          meta = {
+            description = "Wallpaper palette generator";
+            homepage = "https://github.com/warpwm/lule";
+            license = pkgs.lib.licenses.mit;
+            mainProgram = "lule";
+            platforms = pkgs.lib.platforms.linux;
+          };
+        });
 
         # `-static` needs libc.a and libdl.a, which nixpkgs keeps in a separate output rather than
         # in the default glibc.
@@ -68,6 +117,11 @@
             pkgs.mdbook
           ];
         });
+      } // {
+        packages = { default = lule; inherit lule; };
+        apps.default = { type = "app"; program = "${lule}/bin/lule"; };
+        apps.lule = { type = "app"; program = "${lule}/bin/lule"; };
+        checks.lule = lule;
       }
     );
 }
