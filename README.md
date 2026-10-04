@@ -48,8 +48,8 @@ Tagged releases are cached for `x86_64-linux` and `aarch64-linux`:
 
 ```sh
 cachix use termworks
-nix build --accept-flake-config github:warpwm/lule/v0.5.4
-nix run --accept-flake-config github:warpwm/lule/v0.5.4 -- --version
+nix build --accept-flake-config github:termworks/lule/v0.5.5
+nix run --accept-flake-config github:termworks/lule/v0.5.5 -- --version
 ```
 
 The cache is `https://termworks.cachix.org`, with public signing key
@@ -57,7 +57,7 @@ The cache is `https://termworks.cachix.org`, with public signing key
 Only pushed `v*` tags publish to the cache; branch revisions may need compilation.
 Use `oslo make nix-build` and `oslo make nix-check` for local package checks.
 
-From another flake, set `inputs.lule.url = "github:warpwm/lule/v0.5.4"` and
+From another flake, set `inputs.lule.url = "github:termworks/lule/v0.5.5"` and
 use `lule.packages.${system}.default`. Enable the cache on the consuming machine
 with `cachix use termworks`; input flakes do not apply their `nixConfig`
 automatically.

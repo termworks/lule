@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.5] - 2026-10-04
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Use canonical lule repository
+
 ## [0.5.4] - 2026-10-04
 
 ### <!-- 7 -->⚙️ Miscellaneous Tasks
