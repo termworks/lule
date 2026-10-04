@@ -1,0 +1,84 @@
+name: nix-cache
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nix-cache-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'warpwm/lule' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            system: x86_64-linux
+          - runner: ubuntu-24.04-arm
+            system: aarch64-linux
+    steps:
+      - name: Check publishing credentials
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: |
+          if [ -z "$CACHIX_AUTH_TOKEN" ]; then
+            echo "::error::Add a termworks cache write token as the CACHIX_AUTH_TOKEN Actions secret."
+            exit 1
+          fi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@b85815f71a6de0ddee80b8a80a98d43f4bcc66c7
+      - uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866
+        with:
+          name: termworks
+          skipPush: true
+      - name: Build package and run install checks
+        run: |
+          nix build --accept-flake-config --no-update-lock-file --print-build-logs \
+            --no-link --print-out-paths .#lule > "$RUNNER_TEMP/lule-store-paths"
+      - name: Publish runtime closure and pin release
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          SYSTEM: ${{ matrix.system }}
+        run: |
+          cachix push termworks < "$RUNNER_TEMP/lule-store-paths"
+          path=$(cat "$RUNNER_TEMP/lule-store-paths")
+          cachix pin termworks "lule-$GITHUB_REF_NAME-$SYSTEM" "$path"
+
+  verify-download:
+    needs: publish
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@b85815f71a6de0ddee80b8a80a98d43f4bcc66c7
+      - uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866
+        with:
+          name: termworks
+          skipPush: true
+      - name: Download package without local or remote builders
+        run: |
+          nix build --accept-flake-config --no-update-lock-file \
+            --max-jobs 0 --builders '' .#lule
+          result/bin/lule --version
+          result/bin/lule --help
+          export LULE_A="$RUNNER_TEMP/lule-cache"
+          mkdir -p "$LULE_A"
+          result/bin/lule create --image=resources/theme_dark.png -- set
+          test "$(grep -c . "$LULE_A/colors")" = 256
+          grep -qE '^#[0-9a-f]{6}$' "$LULE_A/colors"
