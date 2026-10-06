@@ -18,12 +18,25 @@
       let
         pkgs = import nixpkgs { inherit system; };
 
+        resvgStatic = pkgs.runCommand "resvg-static-${pkgs.resvg.version}" { } ''
+          mkdir -p $out/lib/pkgconfig $out/include
+          cp ${pkgs.resvg}/lib/libresvg.a $out/lib/
+          cp ${pkgs.resvg}/include/resvg.h $out/include/
+          cat > $out/lib/pkgconfig/resvg-static.pc <<EOF
+          Name: resvg-static
+          Description: Statically linked SVG renderer
+          Version: ${pkgs.resvg.version}
+          Libs: -L$out/lib -lresvg -ldl -lpthread -lm
+          Cflags: -I$out/include
+          EOF
+        '';
+
         lule = pkgs.stdenv.mkDerivation (finalAttrs: {
           pname = "lule";
           version = builtins.head (builtins.match ".*version:[[:space:]]*'([^']+)'.*" (builtins.readFile ./v.mod));
           src = pkgs.lib.cleanSource ./.;
           nativeBuildInputs = [ pkgs.vlang pkgs.pkg-config ];
-          buildInputs = [ pkgs.lua5_4 ];
+          buildInputs = [ pkgs.lua5_4 resvgStatic ];
 
           buildPhase = ''
             runHook preBuild
@@ -50,6 +63,9 @@
             $out/bin/lule create --image=resources/theme_dark.png -- set
             test "$(grep -c . "$LULE_A/colors")" = 256
             grep -qE '^#[0-9a-f]{6}$' "$LULE_A/colors"
+            env -i PATH=/nonexistent $out/bin/lule wallpaper --logo=resources/LOGO.png --size=35 --color=336699 \
+              --width=320 --height=200 --seed=42 --output="$TMPDIR/wallpaper.png"
+            test -s "$TMPDIR/wallpaper.png"
             runHook postInstallCheck
           '';
 
@@ -97,6 +113,7 @@
           # Nothing of Lua is vendored: the version is pinned by flake.lock like the rest.
           pkgs.lua5_4
           pkgs.pkg-config
+          resvgStatic
         ];
       in
       {

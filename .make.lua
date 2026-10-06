@@ -97,7 +97,7 @@ local function report(path)
   line("binary", path)
   -- Bytes beside megabytes: `1.16 MB` cannot be subtracted from last week's `1.13 MB` to get one.
   line("size", megabytes .. dim("   " .. grouped(stat.size) .. " bytes"))
-  line("linking", oslo.ui.style("✓ static", { fg = "green" }) .. dim("   no runtime dependencies"))
+  line("linking", oslo.ui.style("✓ static", { fg = "green" }) .. dim("   renderer and PNG encoder built in"))
   if on_path(dir) then
     line("path", oslo.ui.style("✓ on $PATH", { fg = "green" }) .. dim("  " .. dir))
   else
@@ -245,9 +245,33 @@ make.recipe{
     -- return values are not truncated to one.
     sh.v("test", table.unpack(dirs))
     make.run("smoke")
+    make.run("wallpaper-smoke")
   end,
 }
 make.alias("t", "test")
+
+make.recipe{
+  name = "wallpaper-smoke",
+  desc = "check interactive and scripted wallpaper generation",
+  deps = { "build" },
+  run = function() sh.bash("misc/test-wallpaper.sh", BIN) end,
+}
+
+make.recipe{
+  name = "wallpaper-isolation",
+  desc = "render with only the binary and logos in an empty root (needs bubblewrap)",
+  deps = { "build" },
+  run = function(a) sh.bash("misc/test-wallpaper-isolation.sh", BIN, a.logo or "") end,
+}
+
+make.recipe{
+  name = "wallpaper-gallery",
+  desc = "render every pattern and an HTML contact sheet for visual review",
+  deps = { "build" },
+  run = function(a)
+    sh.bash("misc/wallpaper-gallery.sh", BIN, a.output or "target/pattern-gallery", a.logo or "resources/LOGO.png")
+  end,
+}
 
 make.recipe{
   name = "smoke",
@@ -306,7 +330,7 @@ make.recipe{
   run = function(a)
     local argv = { DEV_BIN }
     for key, value in pairs(a) do
-      if key ~= "rest" then
+      if type(key) == "string" and key ~= "rest" then
         if value == true then
           argv[#argv + 1] = "--" .. key
         elseif type(value) == "string" then
@@ -316,7 +340,7 @@ make.recipe{
     end
     for _, word in ipairs(a.rest or {}) do argv[#argv + 1] = word end
     local ran = oslo.run(argv)
-    os.exit(ran.status or 0)
+    assert(ran.ok, "lule exited " .. tostring(ran.status))
   end,
 }
 make.alias("r", "run")

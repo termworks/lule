@@ -33,14 +33,102 @@ lule create -- set
 nix develop --command oslo make build
 ```
 
-One statically linked binary at `target/lule`, with no runtime dependencies. Without nix, any V
-toolchain and a C compiler will do:
+One statically linked binary at `target/lule`, including the SVG renderer and PNG encoder.
+There are no runtime renderer commands, shared libraries, or launcher scripts.
+The Nix build supplies Lua and the resvg static archive. Outside Nix, install a V/C
+toolchain, static Lua 5.4, and resvg's C static library, with `lua5.4.pc` and
+`resvg-static.pc` on `PKG_CONFIG_PATH`:
 
 ```
 v -prod -cflags -static src/ -o target/lule
 ```
 
 `oslo make` lists the rest — `dev`, `test`, `verify`, `install`, `docs`, `release`.
+
+## Generate a wallpaper
+
+```sh
+lule wallpaper
+```
+
+Enter a logo path (SVG or PNG) and its size percentage. Each run
+creates **one PNG with a randomly chosen, code-generated pattern**, a centered logo, and a
+background that fades darker toward the bottom. It does not set the desktop wallpaper or
+modify your originals. The default canvas is 3456×2160, matching the reference wallpapers.
+
+Omit `--color` to automatically choose a bright, colorful background without a prompt.
+Random colors use 65–85% HSL saturation and 62–70% lightness, avoiding white, black,
+gray, and very dark shades. `--color` still accepts any explicit hex color.
+`--seed` reproduces both the random color and pattern.
+
+Size is the logo's bounding square as a percentage of the shorter canvas side (default 35%).
+Aspect ratio, transparency, and logo colors are preserved; padding inside the logo counts
+toward its size. Use a self-contained SVG or transparent PNG without unwanted margins.
+
+```sh
+lule wallpaper --logo=~/.dot/.bresilla/logo.svg --size=40
+lule wallpaper --logo=~/.dot/.bresilla/logo.svg --size=35 --color='#ff9eae'
+lule wallpaper --logo=logo.png --size=40 --color='#80b8cd' \
+  --style=honey --seed=42 --output=wallpaper.png
+lule wallpaper --logo=logo.svg --size=35 --color='#80b8cd' \
+  --style=contours --format=svg --output=wallpaper.svg
+```
+
+There are **43 patterns**, all included in the random selection. List them without generating:
+
+```sh
+lule wallpaper --list-patterns
+lule wallpaper --logo=logo.svg --size=40 --style=flowfield
+```
+
+| Family | Pattern names |
+| --- | --- |
+| Original collection | `cross`, `digi`, `dome`, `dots`, `grid`, `hexag`, `honey`, `nato`, `stars`, `triang`, `contours` |
+| Geometric and woven | `diagonals`, `chevrons`, `herringbone`, `basketweave`, `brick`, `diamonds`, `octagons`, `scales`, `seigaiha`, `circles`, `quatrefoil`, `greekkey`, `pinwheel`, `asanoha`, `cubes`, `crosshatch` |
+| Routed tiles | `truchet`, `maze`, `circuit` |
+| Flowing lines | `waves`, `ribbons`, `flowfield` |
+| Cellular and ornamental | `voronoi`, `pebbles`, `constellation`, `phyllotaxis`, `spirals`, `rosettes` |
+| Recursive geometry | `sierpinski`, `koch`, `hilbert`, `branches` |
+
+All geometry is generated in V, not copied from a texture or downloaded at runtime.
+Random tile orientations, noise fields, jittered sites, and branching are seeded. A fixed
+`--style` and `--seed` reproduce the same pattern; automatic style selection can change
+when new patterns are added to the list. Recursion depth and geometry density are bounded.
+
+Algorithm references: [Truchet tiling and patterns](https://thebookofshaders.com/09/),
+[flow fields](https://www.tylerxhobbs.com/words/flow-fields),
+[Voronoi cells](https://www.redblobgames.com/x/1929-voronoi-percolation/),
+[recursive botanical models](https://algorithmicbotany.org/papers/l-sys.csiro96.html), and
+[fractal noise](https://paulbourke.net/fractals/noise/).
+
+The default output is `<pattern>-<seed>.png` in the current directory. `--output` can point
+into an existing directory, including `~/.wallpaper/`. Existing files, including symlinks,
+are never overwritten. `--width` and `--height` change the resolution (64–8192 per side,
+at most 40 million pixels). Flags accept either `--name=value` or `--name value`.
+
+PNG export uses the statically linked resvg C API and V's built-in stb PNG encoder.
+These are build dependencies only; copying the executable is enough to use it.
+SVG logos should have text converted to paths; system fonts are not loaded.
+SVG output embeds the logo, so moving the wallpaper does not break the logo link.
+Run `lule wallpaper --help` for all options.
+
+`oslo make verify` includes PNG export with an empty environment and no commands on PATH.
+`oslo make wallpaper-isolation` additionally tests both logo formats in an empty filesystem
+and network namespace (requires bubblewrap as a test tool, not a runtime dependency).
+`oslo make wallpaper-gallery --logo=/path/to/logo.svg` creates an HTML preview of every
+pattern under `target/pattern-gallery/`; use `--output=NEW_DIRECTORY` for a fresh gallery.
+
+For non-Nix builds, build the [resvg C library](https://github.com/linebender/resvg/tree/main/crates/c-api)
+and install its header and archive. The `resvg-static.pc` file must point to the archive
+explicitly rather than a shared library (replace `/opt/resvg` with your installation):
+
+```pkgconfig
+Name: resvg-static
+Description: Statically linked SVG renderer
+Version: 0.48.1
+Libs: -L/opt/resvg/lib -l:libresvg.a -ldl -lpthread -lm
+Cflags: -I/opt/resvg/include
+```
 
 ### Nix binary cache
 
