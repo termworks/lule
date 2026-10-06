@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0] - 2026-10-06
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Retain five package revisions
+- Retain only latest binaries
+
 ## [0.5.5] - 2026-10-04
 
 ### <!-- 1 -->🐛 Bug Fixes

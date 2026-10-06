@@ -5,7 +5,7 @@ module cmd
 // "unknown function", while the file on disk looked perfectly correct.
 import os
 
-pub const version = '0.5.5'
+pub const version = '0.6.0'
 pub const description = "a command line to set 255 colors on tty's and other places that use ANSI colors"
 
 pub struct Args {
@@ -17,7 +17,7 @@ pub mut:
 	present    map[string]bool
 }
 
-pub const subcommands = ['create', 'daemon', 'colors', 'config', 'test']
+pub const subcommands = ['create', 'daemon', 'colors', 'config', 'test', 'wallpaper']
 
 pub const multi_flags = ['pattern']
 
@@ -129,6 +129,8 @@ pub fn print_help(logo string) {
 	println('    -V, --version              Prints version information')
 	println('')
 	println('SUBCOMMANDS:')
+	println('    wallpaper Generate wallpapers from a logo, size and color')
+	println('                lule wallpaper --help for options; no flags starts three prompts')
 	println('    create    Generate new colors from an image')
 	println('                --wallpath=<DIRPATH>  folder to pick an image randomly')
 	println('                --image=<FILEPATH>    image to extract colors from')

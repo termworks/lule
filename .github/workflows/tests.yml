@@ -85,3 +85,6 @@ jobs:
           ./target/lule colors -- ansii | head -3
           ./target/lule colors -- json | head -3
           echo "smoke: $count colours, $distinct distinct"
+
+      - name: Standalone wallpaper smoke test
+        run: bash misc/test-wallpaper.sh target/lule

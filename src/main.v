@@ -7,6 +7,7 @@ import ui
 import color
 import os
 import cmd
+import wallgen
 
 fn cmd_create(a &cmd.Args, mut scheme config.Scheme) {
 	mut hooks := config.resolve(a, mut scheme, a.action != 'regen')
@@ -142,14 +143,27 @@ fn cmd_test(a &cmd.Args, mut scheme config.Scheme) {
 
 fn main() {
 	argv := os.args[1..]
+	a := cmd.parse_args(argv)
+	if a.subcommand == 'wallpaper' {
+		mut args := argv.clone()
+		for i, arg in args {
+			if arg != '' && 'wallpaper'.starts_with(arg) {
+				args.delete(i)
+				break
+			}
+		}
+		wallgen.run(args) or {
+			eprintln('error: ${err}')
+			exit(1)
+		}
+		return
+	}
 	mut scheme := config.Scheme{}
 
 	if argv.len == 0 {
 		cmd.print_help(cmd.read_logo())
 		return
 	}
-
-	a := cmd.parse_args(argv)
 
 	if a.present['help'] || a.present['h'] {
 		cmd.print_help(cmd.read_logo())
